@@ -5,4 +5,7 @@
  *   Λ = 2πZ ⊕ (A/2 + iL/2)Z;  σ(x, y, z, w) = (x, y, z)/(1 − w).
  * Step-3 holonomy integrand is sin²(φ/2)·θ′ (paper typo: square confirmed by ST).
  */
-export {}
+export * from './profile'
+export * from './interpolant'
+export * from './torus'
+export * from './projection'

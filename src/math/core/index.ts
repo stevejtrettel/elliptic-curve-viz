@@ -4,3 +4,5 @@
  */
 export * from './integers'
 export * from './complex'
+export * from './vec'
+export * from './quaternion'

@@ -8,6 +8,8 @@ import { Complex } from '@/math/core'
 import { Mat2Z } from '@/math/arithmetic'
 
 const TOL_SL2Z = 1e-10
+/** Fundamental-domain boundary snap: Re = ±½ and |τ| = 1 are identified. */
+const TOL_BOUNDARY = 1e-9
 const MAX_REDUCTION_STEPS = 200
 
 /** Möbius action of g = ((a, b), (c, d)) on the upper half-plane: z ↦ (az+b)/(cz+d). */
@@ -49,7 +51,7 @@ export class Lattice {
         g = new Mat2Z(0n, -1n, 1n, 0n).mul(g) // S
         changed = true
       }
-      if (!changed) return { tau: t, g }
+      if (!changed) return canonicalizeBoundary(t, g)
     }
     throw new Error(`SL₂(ℤ) reduction did not converge for τ = ${this.tau.re} + ${this.tau.im}i`)
   }
@@ -58,4 +60,27 @@ export class Lattice {
   covolume(): number {
     return this.tau.im
   }
+}
+
+/**
+ * Snap to a canonical representative on the fundamental-domain boundary, so
+ * two numerically-noisy reductions of the same lattice compare equal:
+ * Re = +½ is identified with −½ (by T), and on the unit circle τ ~ −1/τ
+ * (which reflects Re) — canonical choices: Re = −½, and Re ≤ 0 on the circle.
+ */
+function canonicalizeBoundary(t: Complex, g: Mat2Z): ReducedTau {
+  if (Math.abs(t.re - 0.5) < TOL_BOUNDARY) {
+    t = new Complex(t.re - 1, t.im)
+    g = new Mat2Z(1n, -1n, 0n, 1n).mul(g) // T⁻¹
+  }
+  if (Math.abs(t.abs2() - 1) < TOL_BOUNDARY && t.re > TOL_BOUNDARY) {
+    t = new Complex(-t.re, t.im).div(new Complex(t.abs2(), 0)) // S: on the circle, Re ↦ −Re
+    g = new Mat2Z(0n, -1n, 1n, 0n).mul(g)
+    if (Math.abs(t.re - 0.5) < TOL_BOUNDARY) {
+      // the corner ρ = e^{iπ/3} cycles back to Re = +½; re-identify
+      t = new Complex(t.re - 1, t.im)
+      g = new Mat2Z(1n, -1n, 0n, 1n).mul(g)
+    }
+  }
+  return { tau: t, g }
 }

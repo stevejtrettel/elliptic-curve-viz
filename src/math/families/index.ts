@@ -3,4 +3,4 @@
  * Realizable region {0 < Re ≤ ½} ∖ {|τ−½| < ½}; strata: latitude circles (closed form),
  * equatorial wavy (1-param), general wavy (2-param Newton). Returns Candidate[].
  */
-export {}
+export * from './solver'
