@@ -14,7 +14,7 @@
  * Two precision tiers (DESIGN §5.3): Float64 tables + lerp for surface meshes;
  * spectral antiderivatives + Newton for data points (machine precision).
  */
-import { Complex, Vec4 } from '@/math/core'
+import { Complex, Vec4, cross4 } from '@/math/core'
 
 import { PeriodicInterpolant, invertMonotoneTable, lerpTable } from './interpolant'
 import type { ProfileCurve } from './profile'
@@ -164,6 +164,66 @@ export class HopfTorus {
     const f = lerpTable(this.holTable, v, TWO_PI)
     return (s: number) => hopfFiberPoint(theta, phi, s - f)
   }
+
+  /**
+   * Everything the analytic surface frame needs at curve parameter v, computed
+   * once per profile-curve column (O(samples)); framePoint then evaluates each
+   * fiber row in closed form. Used by geometry's HopfTorusMesh (DESIGN §6:
+   * normals are analytic, not finite-difference).
+   */
+  profileFrameAt(v: number): ProfileFrame {
+    return {
+      theta: v + this.thetaP.value(v),
+      phi: this.phi.value(v),
+      dTheta: 1 + this.thetaP.derivative(v),
+      dPhi: this.phi.derivative(v),
+      f: this.holIntegrand.antiderivative(v),
+      fRate: this.holIntegrand.value(v),
+    }
+  }
+
+  /** Position + unit surface normal in T_hS³ at (u, x) ∈ [0, 1)². */
+  surfaceFrame(u: number, x: number): { point: Vec4; normal: Vec4 } {
+    return framePoint(this.profileFrameAt(TWO_PI * x), TWO_PI * u)
+  }
+}
+
+/** Profile-curve data at one parameter value, for closed-form frame evaluation. */
+export interface ProfileFrame {
+  theta: number
+  phi: number
+  dTheta: number
+  dPhi: number
+  /** Holonomy f(v). */
+  f: number
+  /** f′(v) = sin²(φ/2)·θ′. */
+  fRate: number
+}
+
+/**
+ * Closed-form surface point and unit normal at fiber coordinate s, given the
+ * profile frame. Tangents: T₁ = ∂H/∂s (fiber direction) and
+ * T₂ = θ′·∂H/∂θ + φ′·∂H/∂φ − f′·∂H/∂s; normal = cross4(h, T₁, T₂) normalized.
+ */
+export function framePoint(frame: ProfileFrame, s: number): { point: Vec4; normal: Vec4 } {
+  const arg = s - frame.f
+  const sinHalf = Math.sin(frame.phi / 2)
+  const cosHalf = Math.cos(frame.phi / 2)
+  const ca = Math.cos(frame.theta + arg)
+  const sa = Math.sin(frame.theta + arg)
+  const cs = Math.cos(arg)
+  const ss = Math.sin(arg)
+  const point = new Vec4(ca * sinHalf, sa * sinHalf, cs * cosHalf, ss * cosHalf)
+  const dHds = new Vec4(-sa * sinHalf, ca * sinHalf, -ss * cosHalf, cs * cosHalf)
+  const dHdTheta = new Vec4(-sa * sinHalf, ca * sinHalf, 0, 0)
+  const dHdPhi = new Vec4((ca * cosHalf) / 2, (sa * cosHalf) / 2, (-cs * sinHalf) / 2, (-ss * sinHalf) / 2)
+  const t2 = new Vec4(
+    frame.dTheta * dHdTheta.x + frame.dPhi * dHdPhi.x - frame.fRate * dHds.x,
+    frame.dTheta * dHdTheta.y + frame.dPhi * dHdPhi.y - frame.fRate * dHds.y,
+    frame.dTheta * dHdTheta.z + frame.dPhi * dHdPhi.z - frame.fRate * dHds.z,
+    frame.dTheta * dHdTheta.w + frame.dPhi * dHdPhi.w - frame.fRate * dHds.w,
+  )
+  return { point, normal: cross4(point, dHds, t2).normalize() }
 }
 
 /** H₍θ,φ₎(s) = (e^{i(θ+s)} sin(φ/2), e^{is} cos(φ/2)) in the fixed ℂ² ≅ ℝ⁴. */

@@ -3,4 +3,8 @@
  * Renderables cache S³ samples; S3Group owns the projection; style.ts maps structure
  * to color/size arrays.
  */
-export {}
+export * from './s3group'
+export * from './torus-mesh'
+export * from './point-cloud'
+export * from './style'
+export * from './materials'

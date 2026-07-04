@@ -78,4 +78,24 @@ export class S3Projection {
     if (Math.abs(denom) < 1e-12) return 2e12
     return 2 / denom
   }
+
+  /**
+   * The differential d(σ∘ρ)ₓ applied to a tangent vector v ∈ T_xS³ — closed
+   * form, no ε-evaluations: with x′ = ρx, v′ = ρv (the whole orientation chain
+   * is linear), dσ(v′) = (v′_xyz + σ(x′)·v′_w)/(1 − x′_w). Since σ∘ρ is
+   * conformal, the projected surface normal is the normalized image of the S³
+   * normal (DESIGN §6: reproject rewrites positions AND normals exactly).
+   */
+  projectTangent(x: Vec4, v: Vec4): Vec3 {
+    const h = this.orient(x)
+    const t = this.orient(v)
+    const denom = 1 - h.w
+    if (Math.abs(denom) < 1e-12) {
+      return new Vec3(t.x * 1e12, t.y * 1e12, t.z * 1e12)
+    }
+    const sx = h.x / denom
+    const sy = h.y / denom
+    const sz = h.z / denom
+    return new Vec3((t.x + sx * t.w) / denom, (t.y + sy * t.w) / denom, (t.z + sz * t.w) / denom)
+  }
 }

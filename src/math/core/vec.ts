@@ -27,6 +27,10 @@ export class Vec3 {
     return this.x * v.x + this.y * v.y + this.z * v.z
   }
 
+  cross(v: Vec3): Vec3 {
+    return new Vec3(this.y * v.z - this.z * v.y, this.z * v.x - this.x * v.z, this.x * v.y - this.y * v.x)
+  }
+
   norm2(): number {
     return this.dot(this)
   }
@@ -88,4 +92,24 @@ export class Vec4 {
       Math.abs(this.w - v.w) <= tol
     )
   }
+}
+
+/**
+ * Generalized cross product in ℝ⁴: the unique vector orthogonal to a, b, c
+ * with |a ∧ b ∧ c| magnitude, via cofactor expansion of det(e; a; b; c).
+ * Used for surface normals in T_hS³ (h, ∂s, ∂v ↦ normal).
+ */
+export function cross4(a: Vec4, b: Vec4, c: Vec4): Vec4 {
+  const m01 = b.x * c.y - b.y * c.x
+  const m02 = b.x * c.z - b.z * c.x
+  const m03 = b.x * c.w - b.w * c.x
+  const m12 = b.y * c.z - b.z * c.y
+  const m13 = b.y * c.w - b.w * c.y
+  const m23 = b.z * c.w - b.w * c.z
+  return new Vec4(
+    a.y * m23 - a.z * m13 + a.w * m12,
+    -(a.x * m23 - a.z * m03 + a.w * m02),
+    a.x * m13 - a.y * m03 + a.w * m01,
+    -(a.x * m12 - a.y * m02 + a.z * m01),
+  )
 }
