@@ -11,6 +11,7 @@ import {
   ProceduralEquirectTexture,
   ShapedAreaLight,
 } from 'three-gpu-pathtracer'
+import { RectAreaLightUniformsLib } from 'three/addons/lights/RectAreaLightUniformsLib.js'
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js'
 
 import type { BackdropSpec, CameraSpec, EnvSpec, LightSpec, StageBounds, StudioSpec } from './specs'
@@ -122,9 +123,16 @@ function compileEnvironment(
 
 // ── lights ──────────────────────────────────────────────────────────────────
 
+let areaUniformsReady = false
+
 function compileLight(spec: LightSpec, radius: number): THREE.Light {
   if (spec.kind === 'custom') return spec.create()
   const color = spec.color ?? 0xffffff
+  if (spec.kind === 'area' && !areaUniformsReady) {
+    // RectAreaLight renders black in raster without the uniforms lib
+    RectAreaLightUniformsLib.init()
+    areaUniformsReady = true
+  }
   let light: THREE.Light
   switch (spec.kind) {
     case 'spot': {
@@ -190,7 +198,9 @@ export function compileStudio(
   let floor: THREE.Mesh | null = null
   if (spec.backdrop && spec.backdrop.kind === 'floor') {
     const { y, size } = placeFloor(spec.backdrop, bounds)
-    const mat = new THREE.MeshPhysicalMaterial({
+    // Standard (not Physical): the floor fills much of the frame — keep its
+    // raster shader cheap; the tracer handles Standard identically.
+    const mat = new THREE.MeshStandardMaterial({
       color: spec.backdrop.color ?? 0xffffff,
       roughness: 0.6,
       metalness: 0,

@@ -28,6 +28,8 @@ describe('bakeInstancedMesh', () => {
     const col = baked.geometry.getAttribute('color')
     expect(pos.count).toBe(3 * SPHERE_VERTS)
     expect(col.count).toBe(pos.count)
+    expect(col.itemSize).toBe(4) // RGBA — the tracer's pipeline requires 4-component color
+    expect(col.getW(0)).toBe(1)
     // instance 0 red, instance 1 blue
     expect(col.getX(0)).toBeCloseTo(1, 6)
     expect(col.getZ(SPHERE_VERTS)).toBeCloseTo(1, 6)

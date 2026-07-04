@@ -7,5 +7,8 @@ export default defineConfig({
   },
   test: {
     include: ['test/**/*.test.ts'],
+    // solver round-trips and whole-group orbit walks are compute-heavy; keep
+    // headroom so a loaded machine (AV scanner, GPU sessions) doesn't flake them
+    testTimeout: 30000,
   },
 })

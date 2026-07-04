@@ -223,7 +223,10 @@ export function framePoint(frame: ProfileFrame, s: number): { point: Vec4; norma
     frame.dTheta * dHdTheta.z + frame.dPhi * dHdPhi.z - frame.fRate * dHds.z,
     frame.dTheta * dHdTheta.w + frame.dPhi * dHdPhi.w - frame.fRate * dHds.w,
   )
-  return { point, normal: cross4(point, dHds, t2).normalize() }
+  // sign: chosen so projected normals agree with the outward (positive-volume)
+  // triangle winding of HopfTorusMesh — the path tracer decides glass
+  // entering/exiting from this normal, and inward normals render black
+  return { point, normal: cross4(point, t2, dHds).normalize() }
 }
 
 /** H₍θ,φ₎(s) = (e^{i(θ+s)} sin(φ/2), e^{is} cos(φ/2)) in the fixed ℂ² ≅ ℝ⁴. */

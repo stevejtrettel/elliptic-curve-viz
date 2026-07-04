@@ -56,6 +56,32 @@ describe('HopfTorusMesh', () => {
     expect(pos.getZ(0)).toBeCloseTo(p.z, 5)
   })
 
+  it('normals point OUTWARD, agreeing with the positive-volume winding (glass depends on this)', () => {
+    // the path tracer decides glass entering/exiting from the shading normal:
+    // inward normals render transmission as black (found the hard way, Phase 4)
+    const pos = mesh.geometry.getAttribute('position') as THREE.BufferAttribute
+    const nor = mesh.geometry.getAttribute('normal') as THREE.BufferAttribute
+    const idx = mesh.geometry.getIndex()!
+    let volume = 0
+    let disagree = 0
+    for (let t = 0; t < idx.count; t += 3) {
+      const [a, b, c] = [idx.getX(t), idx.getX(t + 1), idx.getX(t + 2)]
+      const abx = pos.getX(b) - pos.getX(a)
+      const aby = pos.getY(b) - pos.getY(a)
+      const abz = pos.getZ(b) - pos.getZ(a)
+      const acx = pos.getX(c) - pos.getX(a)
+      const acy = pos.getY(c) - pos.getY(a)
+      const acz = pos.getZ(c) - pos.getZ(a)
+      const nx = aby * acz - abz * acy
+      const ny = abz * acx - abx * acz
+      const nz = abx * acy - aby * acx
+      volume += pos.getX(a) * nx + pos.getY(a) * ny + pos.getZ(a) * nz
+      if (nx * nor.getX(a) + ny * nor.getY(a) + nz * nor.getZ(a) <= 0) disagree++
+    }
+    expect(volume).toBeGreaterThan(0) // outward winding
+    expect(disagree).toBe(0) // shading normals agree with it
+  })
+
   it('normals are unit and reprojection is idempotent', () => {
     const nor = mesh.geometry.getAttribute('normal') as THREE.BufferAttribute
     for (const v of [0, 40, 100]) {

@@ -78,6 +78,26 @@ readout.style.cssText =
   'padding:6px 10px;border-radius:6px;display:none'
 document.body.appendChild(readout)
 
+// fps meter (diagnostic; bottom-right)
+const fpsEl = document.createElement('div')
+fpsEl.style.cssText =
+  'position:fixed;right:12px;bottom:12px;font:11px system-ui;color:#666;background:rgba(255,255,255,0.7);' +
+  'padding:3px 8px;border-radius:5px'
+document.body.appendChild(fpsEl)
+let fpsFrames = 0
+let fpsLast = performance.now()
+const fpsTick = () => {
+  requestAnimationFrame(fpsTick)
+  fpsFrames++
+  const now = performance.now()
+  if (now - fpsLast >= 1000) {
+    fpsEl.textContent = `${Math.round((fpsFrames * 1000) / (now - fpsLast))} fps`
+    fpsFrames = 0
+    fpsLast = now
+  }
+}
+fpsTick()
+
 // ── rebuild / style pipeline ────────────────────────────────────────────────
 function rebuildSceneData() {
   const { data } = CURVES[curveIdx]!

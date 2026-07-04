@@ -61,11 +61,17 @@ export class App {
   private running = false
 
   constructor(opts: AppOptions = {}) {
-    this.renderer = new THREE.WebGLRenderer({ antialias: opts.antialias ?? true, preserveDrawingBuffer: true })
-    this.renderer.setPixelRatio(window.devicePixelRatio)
+    // NO preserveDrawingBuffer: it is a severe frame-rate hit on some drivers
+    // (macOS ANGLE/Metal); screenshot() re-renders synchronously before toBlob.
+    this.renderer = new THREE.WebGLRenderer({ antialias: opts.antialias ?? true })
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
+    // the raster transmission pass re-renders the scene into a mipmapped target
+    // whenever glass is visible — half resolution there is visually invisible
+    // through rough glass and roughly halves the live-mode frame cost
+    this.renderer.transmissionResolutionScale = 0.5
     ;(opts.mount ?? document.body).appendChild(this.renderer.domElement)
     this.camera = new PhysicalCamera(45, window.innerWidth / window.innerHeight, 0.01, 500)
     this.camera.position.set(3, 2, 4)
@@ -173,6 +179,9 @@ export class App {
   }
 
   screenshot(): Promise<Blob> {
+    // re-render synchronously so toBlob reads a fresh buffer (no preserveDrawingBuffer)
+    if (this._mode === 'trace' && this.pathTracer) this.pathTracer.renderSample()
+    else this.renderer.render(this.scene, this.camera)
     return new Promise((resolve, reject) => {
       this.renderer.domElement.toBlob((blob) => (blob ? resolve(blob) : reject(new Error('toBlob failed'))), 'image/png')
     })

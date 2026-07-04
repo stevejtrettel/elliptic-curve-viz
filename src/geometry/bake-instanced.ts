@@ -33,14 +33,14 @@ export function bakeInstancedMesh(mesh: THREE.InstancedMesh): THREE.Mesh {
       positions.push(v.x, v.y, v.z)
       v.fromBufferAttribute(tNor, k).applyMatrix3(nm).normalize()
       normals.push(v.x, v.y, v.z)
-      colors.push(c.r, c.g, c.b)
+      colors.push(c.r, c.g, c.b, 1) // RGBA: the tracer's geometry pipeline expects itemSize 4
     }
   }
 
   const geometry = new THREE.BufferGeometry()
   geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3))
+  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4))
 
   const source = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.Material
   const material = source.clone() as THREE.MeshPhysicalMaterial
