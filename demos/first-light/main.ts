@@ -1,13 +1,11 @@
 /**
- * first-light — the Phase 3 milestone demo (DESIGN.md §11): a glass Hopf torus
- * with the exact points of E(F_{p^k}) riding on it; Hopf-fiber and gridline
- * tubes; click a point to light up its Frobenius orbit; the flat fundamental
- * domain beside the torus. Wiring only: every line binds a control to a
- * renderable setter or a rebuild.
+ * first-light — the milestone demo (DESIGN.md §11): a glass Hopf torus with
+ * the exact points of E(F_{p^k}); fiber/gridline tubes; click-to-highlight
+ * Frobenius orbits; the flat fundamental domain; and, since Phase 4, the
+ * paper-white studio with live path tracing and render capture.
+ * Wiring only: every line binds a control to a setter or a rebuild.
  */
 import * as THREE from 'three'
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
-import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js'
 
 import {
   DomainPlaque,
@@ -28,7 +26,7 @@ import { tauOf } from '@/math/arithmetic'
 import { Quaternion, Vec4 } from '@/math/core'
 import { type Candidate, solveProfileCurve } from '@/math/families'
 import { S3Projection } from '@/math/hopf'
-import { ControlPanel } from '@/studio'
+import { App, ControlPanel, addStudioControls, paperWhite } from '@/studio'
 
 import { CURVES } from '../_shared/curves'
 import { edgeCurves, fiberCurves, orbitCurve } from '../_shared/gridCurves'
@@ -37,36 +35,7 @@ import { buildTorusScene, maxFeasibleK } from '../_shared/torusPoints'
 const MAX_POINTS = 20000
 const DIM = 0.82 // gray level for de-emphasized points during orbit highlight
 
-// ── three.js boilerplate ────────────────────────────────────────────────────
-const renderer = new THREE.WebGLRenderer({ antialias: true })
-renderer.setPixelRatio(window.devicePixelRatio)
-renderer.setSize(window.innerWidth, window.innerHeight)
-renderer.toneMapping = THREE.ACESFilmicToneMapping
-document.body.appendChild(renderer.domElement)
-
-const scene = new THREE.Scene()
-scene.background = new THREE.Color(0xf2f3f5)
-scene.environment = new THREE.PMREMGenerator(renderer).fromScene(new RoomEnvironment(), 0.04).texture
-
-const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.01, 500)
-camera.position.set(3, 2, 4)
-const controls = new OrbitControls(camera, renderer.domElement)
-
-scene.add(new THREE.AmbientLight(0xffffff, 0.35))
-const key = new THREE.DirectionalLight(0xffffff, 1.2)
-key.position.set(5, 8, 6)
-scene.add(key)
-const back = new THREE.DirectionalLight(0xffffff, 0.4)
-back.position.set(-6, -3, -5)
-scene.add(back)
-
-window.addEventListener('resize', () => {
-  camera.aspect = window.innerWidth / window.innerHeight
-  camera.updateProjectionMatrix()
-  renderer.setSize(window.innerWidth, window.innerHeight)
-})
-
-// ── state (URL params override initial values: ?curve=1&k=3&fibers=8&grid=6&domain=1) ──
+// ── state (URL params override initial values: ?curve=1&k=3&fibers=8&grid=6&domain=1&trace=1) ──
 const params = new URLSearchParams(location.search)
 const num = (name: string, dflt: number) => (params.has(name) ? Number(params.get(name)) : dflt)
 let curveIdx = num('curve', 0)
@@ -85,11 +54,12 @@ let fiberCount = num('fibers', 0)
 let gridCount = num('grid', 0)
 let tubeRadius = 0.012
 let selectedIdx: number | null = null
-const showDomain = params.get('domain') === '1'
+let showDomain = params.get('domain') === '1'
 
-// ── renderables ─────────────────────────────────────────────────────────────
+// ── app + renderables ───────────────────────────────────────────────────────
+const app = new App()
 const group = new S3Group()
-scene.add(group)
+app.stage.add(group)
 
 let sceneData = rebuildSceneData()
 const torusMesh = new HopfTorusMesh(sceneData.hopf)
@@ -100,9 +70,7 @@ const orbitTube = new TubeSet([], { radius: tubeRadius * 0.8, material: colored(
 group.add(torusMesh, pointCloud, fiberTubes, edgeTubes, orbitTube)
 
 const plaque = new DomainPlaque(sceneData.hopf.lattice, sceneData.flat, { pointRadius: 0.014 })
-plaque.position.set(-2.6, 1.1, 0)
-plaque.visible = showDomain
-scene.add(plaque)
+if (showDomain) app.stage.add(plaque)
 
 const readout = document.createElement('div')
 readout.style.cssText =
@@ -134,6 +102,7 @@ function applySceneData(frameCamera: boolean): void {
   group.setProjection(currentProjection())
   readout.style.display = 'none'
   if (frameCamera) frame()
+  app.invalidate()
 }
 
 function rebuildTubes(): void {
@@ -181,28 +150,26 @@ function currentProjection(): S3Projection {
 }
 
 function frame(): void {
+  // park the flat domain beside the torus (scaled to match) BEFORE framing,
+  // so the camera fit accounts for it when visible
   torusMesh.geometry.computeBoundingSphere()
   const r = torusMesh.geometry.boundingSphere?.radius ?? 3
-  const dir = camera.position.clone().sub(controls.target).normalize()
-  camera.position.copy(dir.multiplyScalar(Math.max(2.5, 3.1 * r)))
-  controls.target.set(0, 0, 0)
-  controls.update()
-  // park the flat domain beside the torus, scaled to match
   plaque.position.set(-1.55 * r, 0.45 * r, 0)
   plaque.scale.setScalar(0.8 * r)
+  app.frame()
 }
 
 // ── orbit picking ───────────────────────────────────────────────────────────
 const raycaster = new THREE.Raycaster()
 let downAt: [number, number] | null = null
-renderer.domElement.addEventListener('pointerdown', (e) => (downAt = [e.clientX, e.clientY]))
-renderer.domElement.addEventListener('pointerup', (e) => {
+app.renderer.domElement.addEventListener('pointerdown', (e) => (downAt = [e.clientX, e.clientY]))
+app.renderer.domElement.addEventListener('pointerup', (e) => {
   if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return
   const ndc = new THREE.Vector2(
     (e.clientX / window.innerWidth) * 2 - 1,
     -(e.clientY / window.innerHeight) * 2 + 1,
   )
-  raycaster.setFromCamera(ndc, camera)
+  raycaster.setFromCamera(ndc, app.camera)
   const idx = pointCloud.instanceAt(raycaster)
   selectedIdx = idx
   if (idx !== null) {
@@ -218,7 +185,8 @@ renderer.domElement.addEventListener('pointerup', (e) => {
     readout.style.display = 'none'
   }
   applyStyle()
-  group.setProjection(currentProjection()) // reproject the (possibly new) orbit tube
+  group.setProjection(currentProjection())
+  app.invalidate()
 })
 
 // ── panel ───────────────────────────────────────────────────────────────────
@@ -226,7 +194,6 @@ const panel = new ControlPanel({ title: 'first light' })
 const curveTab = panel.tab('Curve')
 const pointsTab = panel.tab('Points')
 const viewTab = panel.tab('View')
-const domainTab = panel.tab('Domain')
 
 const candidateLabels = () =>
   candidates.map((c, i) => ({
@@ -243,7 +210,7 @@ const candDropdown = curveTab.dropdown('Embedding', { options: candidateLabels()
 
 curveTab.dropdown(
   'Curve',
-  { options: CURVES.map((c, i) => ({ label: c.label, value: String(i) })), value: '0' },
+  { options: CURVES.map((c, i) => ({ label: c.label, value: String(i) })), value: String(curveIdx) },
   (v) => {
     curveIdx = Number(v)
     candidates = []
@@ -270,7 +237,7 @@ curveTab.dropdown(
       { label: 'auto', value: 'auto' },
       ...[1, 2, 3, 4, 5, 6, 7, 8].map((n) => ({ label: String(n), value: String(n) })),
     ],
-    value: 'auto',
+    value: lobePin === null ? 'auto' : String(lobePin),
   },
   (v) => {
     lobePin = v === 'auto' ? null : Number(v)
@@ -295,22 +262,38 @@ pointsTab.dropdown(
   (v) => {
     colorMode = v as typeof colorMode
     applyStyle()
+    app.invalidate()
   },
 )
 
 pointsTab.slider('Radius', { min: 0.005, max: 0.12, step: 0.005, value: baseRadius }, (v) => {
   baseRadius = v
   pointCloud.setBaseRadius(v)
+  app.invalidate()
 })
 
 pointsTab.toggle('Boost subfields', subfieldBoost, (v) => {
   subfieldBoost = v
   applyStyle()
+  app.invalidate()
 })
 
-pointsTab.toggle('Show points', true, (v) => (pointCloud.visible = v))
+pointsTab.toggle('Show points', true, (v) => {
+  pointCloud.visible = v
+  app.invalidate()
+})
 
-const reproject = () => group.setProjection(currentProjection())
+pointsTab.toggle('Show flat domain', showDomain, (v) => {
+  showDomain = v
+  if (v) app.stage.add(plaque)
+  else app.stage.remove(plaque)
+  app.invalidate()
+})
+
+const reproject = () => {
+  group.setProjection(currentProjection())
+  app.invalidate()
+}
 viewTab.slider('Rotate α', { min: 0, max: 2 * Math.PI, step: 0.01, value: 0 }, (v) => ((alpha = v), reproject()))
 viewTab.slider('Rotate β', { min: 0, max: 2 * Math.PI, step: 0.01, value: 0 }, (v) => ((beta = v), reproject()))
 viewTab.slider('Rotate γ', { min: 0, max: Math.PI, step: 0.01, value: 0 }, (v) => ((gamma = v), reproject()))
@@ -331,20 +314,40 @@ viewTab.slider('Tube radius', { min: 0.004, max: 0.05, step: 0.002, value: tubeR
   fiberTubes.setRadius(v)
   edgeTubes.setRadius(v)
   orbitTube.setRadius(v * 0.8)
+  app.invalidate()
 })
 
-viewTab.toggle('Glass torus', true, (v) => torusMesh.setMaterial(v ? glass() : matte(0xdde3ea)))
-viewTab.toggle('Show torus', true, (v) => (torusMesh.visible = v))
+viewTab.toggle('Glass torus', true, (v) => {
+  torusMesh.setMaterial(v ? glass() : matte(0xdde3ea))
+  app.invalidate()
+})
+viewTab.toggle('Show torus', true, (v) => {
+  torusMesh.visible = v
+  app.invalidate()
+})
 
-domainTab.toggle('Show flat domain', showDomain, (v) => (plaque.visible = v))
+// ── studio ──────────────────────────────────────────────────────────────────
+const handle = app.setStudio(paperWhite)
+addStudioControls(panel, app, handle, {
+  renderName: 'first-light',
+  sidecar: () => ({
+    curve: CURVES[curveIdx]!.label,
+    k,
+    embedding: candidateLabels()[candIdx]?.label,
+    colorMode,
+    projection: { alpha, beta, gamma, poleAngle },
+    fibers: fiberCount,
+    gridlines: gridCount,
+  }),
+})
 
 panel.mount(document.body)
 
 // ── go ──────────────────────────────────────────────────────────────────────
 applySceneData(true)
-renderer.setAnimationLoop(() => {
-  controls.update()
-  renderer.render(scene, camera)
-})
+if (params.get('trace') === '1') app.mode = 'trace'
+// headless-capture hook: block during load until N samples are in the canvas
+if (params.has('blocktrace')) app.stepTrace(Number(params.get('blocktrace')))
+app.start()
 
 export {}

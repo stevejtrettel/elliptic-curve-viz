@@ -5,7 +5,12 @@
  */
 import * as THREE from 'three'
 
-/** Transmissive glass, the torus-surface default. */
+/**
+ * Transmissive glass, the torus-surface default. thickness: 0 is deliberate —
+ * the path tracer treats zero-thickness transmission as a THIN FILM (survey
+ * §5), which is what a torus shell is; a positive thickness reads as solid
+ * glass and rays die inside the shell (renders black).
+ */
 export function glass(color: THREE.ColorRepresentation = 0xc9eaff): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
     color,
@@ -14,7 +19,7 @@ export function glass(color: THREE.ColorRepresentation = 0xc9eaff): THREE.MeshPh
     transparent: true,
     transmission: 0.99,
     ior: 1.05,
-    thickness: 0.01,
+    thickness: 0,
     side: THREE.DoubleSide,
   })
 }

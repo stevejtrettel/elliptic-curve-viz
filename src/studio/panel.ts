@@ -102,6 +102,9 @@ export interface ColorHandle {
   value: string
   set(hex: string): void
 }
+export interface LabelHandle {
+  set(text: string): void
+}
 
 /** A single tab page; controls are appended here. */
 export class Tab {
@@ -225,6 +228,25 @@ export class Tab {
       },
       setLabel(l: string) {
         lab.textContent = l
+      },
+    }
+  }
+
+  /** A read-only text row (e.g. a live samples counter). */
+  label(label: string, initial = ''): LabelHandle {
+    const row = document.createElement('div')
+    row.className = 'cp-row'
+    const lab = document.createElement('label')
+    lab.textContent = label
+    const val = document.createElement('span')
+    val.className = 'cp-val'
+    val.style.flex = '1'
+    val.textContent = initial
+    row.append(lab, val)
+    this.page.appendChild(row)
+    return {
+      set(text: string) {
+        val.textContent = text
       },
     }
   }

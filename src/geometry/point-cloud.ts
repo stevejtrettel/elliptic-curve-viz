@@ -6,14 +6,15 @@
  * Color/size arrays are parallel to the positions (index alignment is the
  * contract with style.ts).
  *
- * Trace-mode bake (merged geometry — the path tracer does not support
- * InstancedMesh) is deferred to Phase 4, when the tracer exists to verify it.
+ * The tracer does not support InstancedMesh, so setMode('trace') swaps in a
+ * lazily-baked merged geometry with per-vertex colors (bake-instanced.ts).
  */
 import * as THREE from 'three'
 
 import { Vec4 } from '@/math/core'
 import { S3Projection } from '@/math/hopf'
 
+import { bakeInstancedMesh } from './bake-instanced'
 import { colored } from './materials'
 import type { S3Renderable } from './s3group'
 
@@ -37,6 +38,9 @@ export class PointCloud extends THREE.Group implements S3Renderable {
   private sizes: number[] | null
   private lastProjection: S3Projection | null = null
   private readonly dummy = new THREE.Object3D()
+  private traceMesh: THREE.Mesh | null = null
+  private traceDirty = true
+  private displayMode: 'live' | 'trace' = 'live'
 
   constructor(pointsS3: Vec4[], opts: PointCloudOptions = {}) {
     super()
@@ -69,6 +73,7 @@ export class PointCloud extends THREE.Group implements S3Renderable {
       this.mesh.setColorAt(i, c)
     }
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true
+    this.invalidateBake()
   }
 
   /** EXPENSIVE — new point set; reallocates only if the count changed. */
@@ -120,6 +125,36 @@ export class PointCloud extends THREE.Group implements S3Renderable {
     }
     this.mesh.instanceMatrix.needsUpdate = true
     this.mesh.computeBoundingSphere()
+    this.invalidateBake()
+  }
+
+  /**
+   * Switch between the live InstancedMesh and the merged trace bake
+   * (DESIGN §6: the tracer has no instancing; bake is lazy, color-only).
+   */
+  setMode(mode: 'live' | 'trace'): void {
+    this.displayMode = mode
+    if (mode === 'trace') this.ensureBake()
+    this.mesh.visible = mode === 'live'
+    if (this.traceMesh) this.traceMesh.visible = mode === 'trace'
+  }
+
+  private invalidateBake(): void {
+    this.traceDirty = true
+    if (this.displayMode === 'trace') this.ensureBake()
+  }
+
+  private ensureBake(): void {
+    if (!this.traceDirty && this.traceMesh) return
+    if (this.traceMesh) {
+      this.remove(this.traceMesh)
+      this.traceMesh.geometry.dispose()
+      ;(this.traceMesh.material as THREE.Material).dispose()
+    }
+    this.traceMesh = bakeInstancedMesh(this.mesh)
+    this.traceMesh.visible = this.displayMode === 'trace'
+    this.add(this.traceMesh)
+    this.traceDirty = false
   }
 
   private buildMesh(material?: THREE.Material): THREE.InstancedMesh {

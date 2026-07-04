@@ -10,6 +10,7 @@ import * as THREE from 'three'
 
 import { Complex } from '@/math/core'
 
+import { bakeInstancedMesh } from './bake-instanced'
 import { matte } from './materials'
 
 export interface DomainPlaqueOptions {
@@ -28,6 +29,9 @@ export class DomainPlaque extends THREE.Group {
   private plaque: THREE.Mesh
   private spheres: THREE.InstancedMesh
   private readonly dummy = new THREE.Object3D()
+  private traceMesh: THREE.Mesh | null = null
+  private traceDirty = true
+  private displayMode: 'live' | 'trace' = 'live'
 
   constructor(lattice: [Complex, Complex], points: Complex[], opts: DomainPlaqueOptions = {}) {
     super()
@@ -72,6 +76,7 @@ export class DomainPlaque extends THREE.Group {
       this.spheres.setColorAt(i, c)
     }
     if (this.spheres.instanceColor) this.spheres.instanceColor.needsUpdate = true
+    this.invalidateBake()
   }
 
   setSizes(sizes: number[] | null): void {
@@ -107,6 +112,33 @@ export class DomainPlaque extends THREE.Group {
     }
     this.spheres.instanceMatrix.needsUpdate = true
     this.spheres.computeBoundingSphere()
+    this.invalidateBake()
+  }
+
+  /** Trace-mode dual representation (the tracer has no instancing). */
+  setMode(mode: 'live' | 'trace'): void {
+    this.displayMode = mode
+    if (mode === 'trace') this.ensureBake()
+    this.spheres.visible = mode === 'live'
+    if (this.traceMesh) this.traceMesh.visible = mode === 'trace'
+  }
+
+  private invalidateBake(): void {
+    this.traceDirty = true
+    if (this.displayMode === 'trace') this.ensureBake()
+  }
+
+  private ensureBake(): void {
+    if (!this.traceDirty && this.traceMesh) return
+    if (this.traceMesh) {
+      this.remove(this.traceMesh)
+      this.traceMesh.geometry.dispose()
+      ;(this.traceMesh.material as THREE.Material).dispose()
+    }
+    this.traceMesh = bakeInstancedMesh(this.spheres)
+    this.traceMesh.visible = this.displayMode === 'trace'
+    this.add(this.traceMesh)
+    this.traceDirty = false
   }
 
   private buildSpheres(count: number): THREE.InstancedMesh {
