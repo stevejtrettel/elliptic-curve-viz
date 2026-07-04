@@ -6,5 +6,7 @@
 export * from './s3group'
 export * from './torus-mesh'
 export * from './point-cloud'
+export * from './tube-set'
+export * from './domain-plaque'
 export * from './style'
 export * from './materials'

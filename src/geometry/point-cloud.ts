@@ -88,6 +88,18 @@ export class PointCloud extends THREE.Group implements S3Renderable {
     if (this.lastProjection) this.reproject(this.lastProjection)
   }
 
+  /**
+   * Raycast the instanced spheres; returns the index into the parallel point
+   * arrays (= E.points() order) of the nearest hit, or null.
+   */
+  instanceAt(raycaster: THREE.Raycaster): number | null {
+    const hits = raycaster.intersectObject(this.mesh, false)
+    for (const hit of hits) {
+      if (hit.instanceId !== undefined) return hit.instanceId
+    }
+    return null
+  }
+
   /** O(points): derive instance matrices from the S³ cache. */
   reproject(proj: S3Projection): void {
     this.lastProjection = proj

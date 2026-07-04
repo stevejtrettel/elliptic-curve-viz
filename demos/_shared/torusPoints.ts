@@ -16,6 +16,10 @@ export interface TorusScene {
   E: CurvePoints
   /** S³ positions parallel to E.points(). */
   positions: Vec4[]
+  /** The flat picture: λ·z ∈ ℂ/Λ_Hopf, parallel to E.points(). */
+  flat: Complex[]
+  lambda: Complex
+  flip: boolean
 }
 
 export function buildTorusScene(data: CurveData, k: number, candidate: Candidate): TorusScene {
@@ -24,14 +28,16 @@ export function buildTorusScene(data: CurveData, k: number, candidate: Candidate
   const hopf = new HopfTorus(candidate.curve)
   // achieved values (recomputed here at the same default sample count) keep
   // matchLattices exact; flip mirrors the lattice and conjugates the points
-  const matchTau = candidate.rep.flip ? new Complex(-tau.re, tau.im) : tau
+  const flip = candidate.rep.flip
+  const matchTau = flip ? new Complex(-tau.re, tau.im) : tau
   const { lambda } = matchLattices(matchTau, hopf.area, hopf.length)
-  const positions = E.points().map((P) => {
+  const flat = E.points().map((P) => {
     let z = E.toComplex(P)
-    if (candidate.rep.flip) z = z.conj()
-    return hopf.rollUp(lambda.mul(z), { exact: true })
+    if (flip) z = z.conj()
+    return lambda.mul(z)
   })
-  return { hopf, E, positions }
+  const positions = flat.map((z) => hopf.rollUp(z, { exact: true }))
+  return { hopf, E, positions, flat, lambda, flip }
 }
 
 /** Largest k ≤ kMax whose |E(F_{p^k})| stays under `cap` points. */
