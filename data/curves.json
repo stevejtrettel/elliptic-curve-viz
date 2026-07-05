@@ -11,5 +11,18 @@
   { "label": "disc −20 · p=5 · form (2,2,3)", "p": 5, "trace": 0, "sign": 1, "form": { "a": 2, "b": 2, "c": 3 }, "equation": { "f": 0, "g": 1 } },
   { "label": "disc −19 · p=5 · form (1,1,5)", "p": 5, "trace": 1, "sign": 1, "form": { "a": 1, "b": 1, "c": 5 }, "equation": { "f": 3, "g": 3 } },
   { "label": "disc −4 · p=5 · form (1,0,1)", "p": 5, "trace": 2, "sign": 1, "form": { "a": 1, "b": 0, "c": 1 }, "equation": { "f": 1, "g": 0 } },
-  { "label": "disc −16 · p=5 · form (1,0,4)", "p": 5, "trace": 2, "sign": 1, "form": { "a": 1, "b": 0, "c": 4 }, "equation": { "f": 1, "g": 3 } }
+  { "label": "disc −16 · p=5 · form (1,0,4)", "p": 5, "trace": 2, "sign": 1, "form": { "a": 1, "b": 0, "c": 4 }, "equation": { "f": 1, "g": 3 } },
+  { "label": "X_0(11) · disc −91 · p=23 · form (1,1,23)", "p": 23, "trace": -1, "sign": -1, "form": { "a": 1, "b": 1, "c": 23 }, "equation": { "f": 17, "g": 16 } },
+  { "label": "X_0(11) · disc −91 · p=23 · form (5,3,5)", "p": 23, "trace": -1, "sign": -1, "form": { "a": 5, "b": 3, "c": 5 }, "equation": { "f": 17, "g": 16 } },
+  { "label": "X_0(11) · disc −16 · p=101 · form (1,0,4)", "p": 101, "trace": 2, "sign": 1, "form": { "a": 1, "b": 0, "c": 4 }, "equation": { "f": 41, "g": 66 } },
+  { "label": "X_0(11) · disc −39 · p=103 · form (1,1,10)", "p": 103, "trace": -16, "sign": -1, "form": { "a": 1, "b": 1, "c": 10 }, "equation": { "f": 101, "g": 38 } },
+  { "label": "X_0(11) · disc −39 · p=103 · form (2,1,5)", "p": 103, "trace": -16, "sign": -1, "form": { "a": 2, "b": 1, "c": 5 }, "equation": { "f": 101, "g": 38 } },
+  { "label": "X_0(11) · disc −39 · p=103 · form (2,-1,5)", "p": 103, "trace": -16, "sign": -1, "form": { "a": 2, "b": -1, "c": 5 }, "equation": { "f": 101, "g": 38 } },
+  { "label": "X_0(11) · disc −39 · p=103 · form (3,3,4)", "p": 103, "trace": -16, "sign": -1, "form": { "a": 3, "b": 3, "c": 4 }, "equation": { "f": 101, "g": 38 } },
+  { "label": "X_0(11) · disc −104 · p=107 · form (1,0,26)", "p": 107, "trace": 18, "sign": 1, "form": { "a": 1, "b": 0, "c": 26 }, "equation": { "f": 90, "g": 54 } },
+  { "label": "X_0(11) · disc −104 · p=107 · form (2,0,13)", "p": 107, "trace": 18, "sign": 1, "form": { "a": 2, "b": 0, "c": 13 }, "equation": { "f": 90, "g": 54 } },
+  { "label": "X_0(11) · disc −104 · p=107 · form (3,2,9)", "p": 107, "trace": 18, "sign": 1, "form": { "a": 3, "b": 2, "c": 9 }, "equation": { "f": 90, "g": 54 } },
+  { "label": "X_0(11) · disc −104 · p=107 · form (3,-2,9)", "p": 107, "trace": 18, "sign": 1, "form": { "a": 3, "b": -2, "c": 9 }, "equation": { "f": 90, "g": 54 } },
+  { "label": "X_0(11) · disc −104 · p=107 · form (5,4,6)", "p": 107, "trace": 18, "sign": 1, "form": { "a": 5, "b": 4, "c": 6 }, "equation": { "f": 90, "g": 54 } },
+  { "label": "X_0(11) · disc −104 · p=107 · form (5,-4,6)", "p": 107, "trace": 18, "sign": 1, "form": { "a": 5, "b": -4, "c": 6 }, "equation": { "f": 90, "g": 54 } }
 ]
