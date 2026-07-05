@@ -11,7 +11,7 @@ import type { TubeCurve } from '@/geometry'
 const TWO_PI = 2 * Math.PI
 
 /** `count` Hopf fibers over uniform curve parameters — exact circles under σ. */
-export function fiberCurves(hopf: HopfTorus, count: number, samples = 96): TubeCurve[] {
+export function fiberCurves(hopf: HopfTorus, count: number, samples = 192): TubeCurve[] {
   return Array.from({ length: count }, (_, f) => {
     const fiber = hopf.fiberAt(f / count)
     return {
@@ -22,7 +22,7 @@ export function fiberCurves(hopf: HopfTorus, count: number, samples = 96): TubeC
 }
 
 /** `count` gridlines along the lattice edge ω₂ = A/2 + iL/2 (closed on the torus). */
-export function edgeCurves(hopf: HopfTorus, count: number, samples = 192): TubeCurve[] {
+export function edgeCurves(hopf: HopfTorus, count: number, samples = 384): TubeCurve[] {
   const [w1, w2] = hopf.lattice
   return Array.from({ length: count }, (_, e) => {
     const z0 = w1.scale(e / count)
@@ -45,7 +45,7 @@ export function orbitCurve(
   lambda: Complex,
   hopf: HopfTorus,
   flip: boolean,
-  segmentSamples = 24,
+  segmentSamples = 48,
 ): TubeCurve {
   const orbit: TorusPoint[] = []
   let Q = P

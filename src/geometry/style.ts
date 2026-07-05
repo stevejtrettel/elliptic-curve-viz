@@ -54,6 +54,14 @@ export function colorByOrbit(E: CurvePoints, palette = DEFAULT): Float32Array {
   return colors
 }
 
+/** One color for every point — the paper's per-discriminant coloring. */
+export function uniformColors(count: number, hex: number): Float32Array {
+  const c = new THREE.Color(hex)
+  const colors = new Float32Array(3 * count)
+  for (let i = 0; i < count; i++) fill(colors, i, c)
+  return colors
+}
+
 /** Number of prime factors with multiplicity (depth of the subfield tower step). */
 function omega(n: number): number {
   let m = n

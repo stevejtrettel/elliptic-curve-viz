@@ -1,18 +1,47 @@
 /**
  * Trace-mode bake (DESIGN.md §6): the path tracer does not support
  * InstancedMesh (survey §5), so instanced renderables maintain a second
- * representation for mode: 'trace' — ONE merged BufferGeometry (low-tess
- * sphere per instance, transformed) with per-point colors as a per-vertex
- * `color` attribute and a single vertexColors material. Consequence: per-point
+ * representation for mode: 'trace' — ONE merged BufferGeometry (sphere per
+ * instance, transformed) with per-point colors as a per-vertex `color`
+ * attribute and a single vertexColors material. Consequence: per-point
  * variation in trace mode is color-only.
+ *
+ * The bake is where tessellation is cheap (built once, rendered for thousands
+ * of samples), so sphere detail is chosen ADAPTIVELY: the finest icosahedron
+ * subdivision that keeps the merged mesh under the triangle budget.
  */
 import * as THREE from 'three'
 
-const TEMPLATE = new THREE.IcosahedronGeometry(1, 1) // 42 verts / 80 tris per point
+/** Total triangle budget for one merged bake. */
+const TRACE_TRI_BUDGET = 3_000_000
+
+/**
+ * Icosahedron subdivision level for `count` instances: detail d costs
+ * 20·4^d triangles per sphere; take the finest level within budget
+ * (detail 4 = 5120 tris/sphere for small clouds, floor at detail 1 = 80).
+ */
+export function traceSphereDetail(count: number): number {
+  for (const d of [4, 3, 2]) {
+    if (count * 20 * 4 ** d <= TRACE_TRI_BUDGET) return d
+  }
+  return 1
+}
+
+const templates = new Map<number, THREE.IcosahedronGeometry>()
+function templateFor(count: number): THREE.IcosahedronGeometry {
+  const detail = traceSphereDetail(count)
+  let t = templates.get(detail)
+  if (!t) {
+    t = new THREE.IcosahedronGeometry(1, detail)
+    templates.set(detail, t)
+  }
+  return t
+}
 
 export function bakeInstancedMesh(mesh: THREE.InstancedMesh): THREE.Mesh {
-  const tPos = TEMPLATE.getAttribute('position') as THREE.BufferAttribute
-  const tNor = TEMPLATE.getAttribute('normal') as THREE.BufferAttribute
+  const template = templateFor(mesh.count)
+  const tPos = template.getAttribute('position') as THREE.BufferAttribute
+  const tNor = template.getAttribute('normal') as THREE.BufferAttribute
   const vPer = tPos.count // icosahedron geometry is non-indexed triangle soup
 
   const positions: number[] = []

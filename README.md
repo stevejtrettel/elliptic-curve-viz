@@ -21,12 +21,30 @@ npm run typecheck  # tsc --noEmit
 npm run lint       # eslint — also enforces the layer boundaries (src/math is pure)
 ```
 
+## Authoring a demo
+
+The whole standard experience — panel, studio, path tracing, orbit picking, URL params —
+is one call (DESIGN.md §7.5):
+
+```ts
+// demos/<name>/main.ts
+import { showCurve } from '@/author'
+showCurve({ curve: 'disc −3 · hexagonal', k: 3, fibers: 8 })
+```
+
+Curves live in [data/curves.json](data/README.md) (the ecfplat handoff contract).
+Useful URL params on any authored demo: `?curve=&k=&fibers=&grid=&domain=1&studio=velvet-dark`,
+`?design=1` (live studio editor + Copy-spec export), `?trace=1` (boot path-traced),
+`?demo=gallery` batch-renders the collection.
+
 ## Layout
 
 ```
 src/math/       pure mathematics — zero dependencies, fully tested
 src/geometry/   three.js renderables (S³-cached buffers)
 src/studio/     app shell, studios, path tracing, GUI
-src/io/         file formats
+src/author/     demo composition: CurveScene, showCurve, the curve catalog
+src/io/         file formats (curve descriptors)
+data/           curves.json — the descriptor catalog
 demos/          one folder per demo; demos/_loader.ts is the index
 ```

@@ -23,12 +23,19 @@ export interface HopfTorusMeshOptions {
   uSegments?: number
   /** Curve-direction segments (default 128). */
   xSegments?: number
+  /** Trace-mode grid (default 384×384): the bake is one-time, spend freely. */
+  uSegmentsTrace?: number
+  xSegmentsTrace?: number
   material?: THREE.Material
 }
 
 export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
   private uSegs: number
   private xSegs: number
+  private readonly segsLive: [number, number]
+  private readonly segsTrace: [number, number]
+  private displayMode: 'live' | 'trace' = 'live'
+  private hopf!: HopfTorus
   private points4!: Float64Array // (x,y,z,w) per vertex — the S³ cache
   private normals4!: Float64Array // unit normals in T_hS³
   private fullIndex!: Uint32Array // all quads; reproject filters holes
@@ -38,12 +45,30 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
     super(new THREE.BufferGeometry(), opts.material ?? glass())
     this.uSegs = opts.uSegments ?? 128
     this.xSegs = opts.xSegments ?? 128
+    this.segsLive = [this.uSegs, this.xSegs]
+    this.segsTrace = [opts.uSegmentsTrace ?? Math.max(384, this.uSegs), opts.xSegmentsTrace ?? Math.max(384, this.xSegs)]
     this.allocate()
     this.setSurface(hopf)
   }
 
+  /**
+   * Live/trace tessellation swap (called by App on mode changes): resample the
+   * surface on the mode's grid — the S³ math reruns, the projection is cached.
+   */
+  setMode(mode: 'live' | 'trace'): void {
+    if (mode === this.displayMode) return
+    this.displayMode = mode
+    const [u, x] = mode === 'trace' ? this.segsTrace : this.segsLive
+    if (u === this.uSegs && x === this.xSegs) return
+    this.uSegs = u
+    this.xSegs = x
+    this.allocate()
+    this.setSurface(this.hopf)
+  }
+
   /** EXPENSIVE — resample the S³ caches in place (the live-animation path). */
   setSurface(hopf: HopfTorus): void {
+    this.hopf = hopf
     const { uSegs, xSegs } = this
     for (let j = 0; j <= xSegs; j++) {
       const frame = hopf.profileFrameAt((TWO_PI * j) / xSegs)
@@ -63,8 +88,11 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
     if (this.lastProjection) this.reproject(this.lastProjection)
   }
 
-  /** EXPENSIVE — reallocate buffers for a new grid; follow with setSurface. */
+  /** EXPENSIVE — set the live-mode grid and reallocate; follow with setSurface. */
   setResolution(uSegments: number, xSegments: number): void {
+    this.segsLive[0] = uSegments
+    this.segsLive[1] = xSegments
+    if (this.displayMode !== 'live') return // applied on the next switch back
     this.uSegs = uSegments
     this.xSegs = xSegments
     this.allocate()

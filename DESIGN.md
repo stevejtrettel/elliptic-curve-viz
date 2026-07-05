@@ -85,8 +85,9 @@ once — (z, w) = (x + iy, z + iw) — and all reorientation happens through two
 ## 4. Repository layout
 
 Single Vite + TypeScript package (strict mode). Import boundaries enforced by lint rule:
-`src/math` imports nothing outside itself (no three.js); `src/geometry` may import three
-and `src/math`; `src/studio` may import all; `demos/*` are leaves.
+`src/math` imports nothing outside itself (no three.js); `src/io` may import only math;
+`src/geometry` may import three and math; `src/studio` may not import `src/author`;
+`src/author` may import all of src; `demos/*` are leaves.
 
 ```
 src/
@@ -98,9 +99,10 @@ src/
     families/              #   profile-curve families + the τ solver
   geometry/                # three.js buffer construction (no scenes, no DOM)
   studio/                  # App, studios, path tracer, GUI panel, export
-  io/                      # file formats: ecfplat exports, curve descriptors
+  author/                  # demo composition: CurveScene, showCurve, catalog (§7.5)
+  io/                      # file formats: curve descriptors, ecfplat exports
+data/                      # curve descriptors (curves.json — the catalog; §8)
 demos/                     # one folder per demo, each a thin main.ts
-  _shared/                 #   tiny helpers demos may share
 docs/                      # this file, surveys/, conventions notes
 test/                      # fixtures (incl. golden data generated from ecfplat)
 ```
@@ -158,8 +160,9 @@ Design notes settled in discussion (2026-07-04):
   coordinates, same denominator. A standalone level-j object is just `pointsOver(data, j)`
   (exponents satisfy N_j | N_k, so cross-level identification is an integer rescale).
 - **No decoration/style types.** Demos are plain code: they call `degree/order/orbits` and
-  build color/size arrays directly (shared palettes & repeated colorings become tiny helper
-  functions in `demos/_shared`, not architecture). Math carries nothing visual.
+  build color/size arrays directly (shared palettes & repeated colorings are tiny helper
+  functions, now in `src/author` — see §7.5 for how that grew into the authoring layer).
+  Math carries nothing visual.
 - **Orbit rendering is selective.** Frobenius is multiplication by α = √p·e^{iψ} — an
   expanding endomorphism — so generic orbits are equidistributed k-point constellations;
   drawing all of them is noise. `orbits()` keeps cyclic order (free), and demos use it for
@@ -329,7 +332,9 @@ the "forgot to update the tubes" bug class. The projection is a property of the 
 `sizeByDegree(pts, {subfieldBoost})`, `highlightOrbit(pts, P)`, shared `PALETTES`.
 Named, tested, reused across demos — not scattered in demo files.
 
-**5. Demos are wiring only**: every line binds a panel control to a setter.
+**5. Demos are wiring only**: every line binds a panel control to a setter. *(Since the
+authoring layer, §7.5, the standard wiring itself ships as `showCurve` — a bespoke demo
+still hand-wires exactly as described here.)*
 
 Concrete renderables and their setters:
 
@@ -462,6 +467,49 @@ latest TypeScript. Note 0.0.24 uses `HDRLoader` (not RGBELoader).
 Layout: `src/studio/{App, Studio, specs, capture, panel/}` + `src/studio/studios/*.ts`
 (the named registry).
 
+## 7.5. `src/author` — demo authoring
+
+*Added 2026-07-04 (after Phase 4), superseding the "no demo framework" stance of §5.1/§6.5
+for the common path.* Phase 4 made studios declarative (StudioSpec, one runtime) and it
+worked; the authoring layer extends the same move to demo composition. The goal, stated by
+ST: choosing an elliptic curve and rendering it must be trivially easy and clear.
+**Sugar, not a cage** — hand-wired demos against geometry/studio remain first-class.
+
+The whole standard demo is one call:
+
+```ts
+import { showCurve } from '@/author'
+showCurve({ title: 'first light' })            // ≡ the entire first-light demo
+showCurve({ curve: 'disc −3 · hexagonal', k: 3, fibers: 8, studio: velvetDark })
+```
+
+`showCurve(spec)` assembles App + CurveScene + standard panel (Curve/Points/View) +
+studio & Studio tab (picker across the registry) + orbit picking + URL params
+(`?curve&k&lobes&fibers&grid&domain&studio&design&trace&blocktrace`, read-at-boot only —
+render reproducibility lives in the sidecar) and returns `{ app, scene, panel, studio,
+frame, dispose }` for imperative escape. Opt-outs: `controls/interaction/urlSync/fps:
+false`, `studio: false`; opt-in `design: true` adds the studio Design tab (live spec
+editing + "Copy spec" export of a ready-to-paste preset module).
+
+Underneath is the composable core, `CurveScene`: state + renderables (S3Group with torus,
+points, tubes; the DomainPlaque staged separately), no App/DOM — constructible headless in
+tests. Recomputation is a **linear ladder**; a setter reruns its stage and every stage
+after it:
+
+| stage | inputs | work |
+|---|---|---|
+| resolve | curve, lobes | `solveProfileCurve`, reset embedding |
+| build | k, embedding | `buildTorusScene` → surface/points/plaque |
+| tubes | fibers, gridlines | fiber/edge/orbit tube curves |
+| style | colorMode, boost, selection | color/size arrays → points & plaque |
+| project | α, β, γ, pole | S3Projection → group |
+
+Cheap knobs (radii, visibility, materials) are not state — use the renderables directly.
+Each completed recompute fires `onChange` once (`showCurve` wires it to `app.invalidate()`).
+`src/author` also holds the catalog (`CURVES` parsed from `data/curves.json`, `resolveCurve`)
+and the promoted math↔geometry glue (`buildTorusScene`, `maxFeasibleK`, grid/fiber/orbit
+curve generators) that began life in `demos/_shared`.
+
 ## 8. `src/io` — data in and out
 
 - **Import (pathway 1):** Nadir's `.txt` point exports (float `[re,im]` pairs; filename
@@ -470,9 +518,12 @@ Layout: `src/studio/{App, Studio, specs, capture, panel/}` + `src/studio/studios
 - **Compute (pathway 2):** given `(a,b,c)` + `(a,p)` (typed in, or looked up in a bundled
   JSON table), `arithmetic` produces exact points internally. This is the preferred path —
   the `.txt` floats lose exactness and group structure.
-- **Own format:** a small JSON *curve descriptor* — `{equation, p, form, trace, sign, k}` —
-  so a demo/render is reproducible from one file. Descriptors of everything rendered for
-  the paper/site accumulate in `data/`.
+- **Own format (BUILT, 2026-07-04):** a small JSON *curve descriptor* —
+  `{label?, p, trace, sign, form, equation?}` — parsed and validated by
+  `src/io/descriptors.ts` (Hasse bound, disc·f² consistency; bigints as numbers or decimal
+  strings). `data/curves.json` is the catalog every demo lists; it is THE handoff contract
+  with ecfplat (contract documented in `data/README.md`). k is chosen at render time, not
+  stored. Render sidecars record the rest of a reproducible view.
 - Ask Nadir: add integer `(x, y) mod N` (from `pts_from_gendic`) + the quadratic form to
   ecfplat's export, so pathway 1 is exact too.
 
@@ -517,7 +568,10 @@ Each phase ends with something visible and testable; plans reviewed before codin
   milestone.
 - **Phase 4 — studios.** `studio` layer: panel GUI, studio registry, path tracer with
   progress UI, screenshot. Deliverable: reproduce a Figure-11-class render from the paper.
-- **Phase 5 — breadth.** Remaining views (§9), io round-trip, curve descriptor gallery,
+- **Phase 4.5 — authoring (built 2026-07-04).** `src/author` (§7.5): `CurveScene` +
+  `showCurve`, catalog from `data/curves.json` descriptors (§8), studio picker/Design
+  tab/spec export, velvet-dark, gallery batch-render demo. first-light = one call.
+- **Phase 5 — breadth.** Remaining views (§9), io round-trip for legacy exports,
   optional static multi-demo build (gallery-ready, per "local-first, keep door open").
 
 ## 12. Decisions log
@@ -536,6 +590,10 @@ Each phase ends with something visible and testable; plans reviewed before codin
 | 2026-07-04 | Point framework: CurvePoints methods only — no decoration types, no filtration API, no style functions; style.ts helpers in geometry; PointCloud/HopfTorusMesh/TubeSet cache S³ samples, view group owns projection |
 | 2026-07-04 | Solver returns sorted Candidate[] (enumeration, not selection); default = shortest L; lobe count = smallest reaching n, user-pinnable |
 | 2026-07-04 | Studios are declarative StudioSpecs compiled by one runtime; runtime-swappable; relative camera framing + bounds-aware backdrop; one coarse invalidate(); starter studio paper-white; render-descriptor sidecar optional flag; PhysicalCamera DoF as optional CameraSpec field |
+| 2026-07-04 | Authoring layer `src/author` (§7.5): demos-as-specs (`showCurve`) atop composable `CurveScene`; extends studios-as-data to demo composition; supersedes "demos are wiring only" for the common path; hand-wiring stays first-class |
+| 2026-07-04 | `demos/_shared` promoted into `src/author`; recompute = linear ladder resolve < build < tubes < style < project; URL params read-at-boot only (no write-back); zero new dependencies |
+| 2026-07-04 | `data/curves.json` descriptor list = the ecfplat handoff contract and the demo catalog (single source, parsed+validated at import); j↔(a,b,c) bijection stays Python-side |
+| 2026-07-04 | Studio design workflow: picker in Studio tab (registry swap), opt-in Design tab edits spec data live via setStudio recompile, "Copy spec" serializes a preset module; second built-in studio velvet-dark |
 
 ## 13. Open questions
 

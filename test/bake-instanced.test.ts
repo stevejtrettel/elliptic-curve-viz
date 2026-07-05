@@ -4,9 +4,10 @@ import { describe, expect, it } from 'vitest'
 import { Vec4 } from '@/math/core'
 import { S3Projection } from '@/math/hopf'
 
-import { PointCloud, bakeInstancedMesh } from '@/geometry'
+import { PointCloud, bakeInstancedMesh, traceSphereDetail } from '@/geometry'
 
-const SPHERE_VERTS = new THREE.IcosahedronGeometry(1, 1).getAttribute('position').count // 42
+// small clouds bake at the finest subdivision within the triangle budget
+const SPHERE_VERTS = new THREE.IcosahedronGeometry(1, traceSphereDetail(3)).getAttribute('position').count
 
 function makeInstanced(count: number): THREE.InstancedMesh {
   const mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 8, 6), new THREE.MeshPhysicalMaterial(), count)
@@ -55,6 +56,21 @@ describe('bakeInstancedMesh', () => {
     mesh.setMatrixAt(1, new THREE.Matrix4().set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0))
     const baked = bakeInstancedMesh(mesh)
     expect(baked.geometry.getAttribute('position').count).toBe(2 * SPHERE_VERTS)
+  })
+})
+
+describe('traceSphereDetail', () => {
+  it('spends the triangle budget: finest for small clouds, coarser as counts grow', () => {
+    expect(traceSphereDetail(300)).toBe(4) // 5120 tris/sphere
+    expect(traceSphereDetail(2000)).toBe(3)
+    expect(traceSphereDetail(9000)).toBe(2)
+    expect(traceSphereDetail(20000)).toBe(1) // floor — never below the old fixed template
+  })
+
+  it('never exceeds ~the budget', () => {
+    for (const count of [10, 500, 3000, 9375, 25000]) {
+      expect(count * 20 * 4 ** traceSphereDetail(count)).toBeLessThanOrEqual(3_000_000)
+    }
   })
 })
 

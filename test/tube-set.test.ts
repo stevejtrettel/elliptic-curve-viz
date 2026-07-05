@@ -6,7 +6,7 @@ import { HopfTorus, LatitudeCircle, S3Projection } from '@/math/hopf'
 
 import { TubeSet } from '@/geometry'
 
-import { edgeCurves, fiberCurves } from '../demos/_shared/gridCurves'
+import { edgeCurves, fiberCurves } from '@/author'
 
 const torus = new HopfTorus(new LatitudeCircle(Math.acos(1 / 3)))
 const R = 8
@@ -154,5 +154,35 @@ describe('edge gridlines', () => {
         expect(cosAngle, `segment angle at ${i}`).toBeGreaterThan(0.9)
       }
     }
+  })
+})
+
+describe('TubeSet.setMode', () => {
+  it('rebuilds the cross-section at trace resolution and restores live on the way back', () => {
+    const curves = fiberCurves(torus, 2, 48)
+    const t = new TubeSet(curves, { radius: 0.02, radialSegments: 8, radialSegmentsTrace: 32 })
+    const proj = new S3Projection()
+    t.reproject(proj)
+    const liveCount = attr(t, 'position').count
+    expect(liveCount).toBe(2 * 49 * 9)
+
+    t.setMode('trace')
+    const traceCount = attr(t, 'position').count
+    expect(traceCount).toBe(2 * 49 * 33)
+    // geometry is real (projection reapplied from the cache), not zeroed placeholders
+    const pos = attr(t, 'position')
+    let norm = 0
+    for (let v = 0; v < traceCount; v++) norm += Math.abs(pos.getX(v)) + Math.abs(pos.getY(v))
+    expect(norm).toBeGreaterThan(0)
+
+    t.setMode('live')
+    expect(attr(t, 'position').count).toBe(liveCount)
+  })
+
+  it('setCurves while in trace mode allocates at trace resolution', () => {
+    const t = new TubeSet([], { radialSegments: 8, radialSegmentsTrace: 16 })
+    t.setMode('trace')
+    t.setCurves(fiberCurves(torus, 1, 24))
+    expect(attr(t, 'position').count).toBe(25 * 17)
   })
 })

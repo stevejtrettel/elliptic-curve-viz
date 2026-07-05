@@ -28,7 +28,10 @@ export interface TubeCurve {
 export interface TubeSetOptions {
   /** Tube radius in S³ (world radii are conformally derived). */
   radius?: number
+  /** Cross-section polygon in live mode (default 8 — cheap to reproject). */
   radialSegments?: number
+  /** Cross-section in trace mode, where the bake is one-time (default 32). */
+  radialSegmentsTrace?: number
   material?: THREE.Material
 }
 
@@ -44,14 +47,22 @@ export class TubeSet extends THREE.Mesh implements S3Renderable {
   private layouts!: CurveLayout[]
   private fullIndex!: Uint32Array
   private radiusS3: number
-  private readonly radialSegments: number
+  private readonly segmentsLive: number
+  private readonly segmentsTrace: number
+  private displayMode: 'live' | 'trace' = 'live'
   private lastProjection: S3Projection | null = null
 
   constructor(curves: TubeCurve[], opts: TubeSetOptions = {}) {
     super(new THREE.BufferGeometry(), opts.material ?? colored(0x4287f5))
     this.radiusS3 = opts.radius ?? 0.015
-    this.radialSegments = opts.radialSegments ?? 8
+    this.segmentsLive = opts.radialSegments ?? 8
+    this.segmentsTrace = opts.radialSegmentsTrace ?? Math.max(32, this.segmentsLive)
     this.setCurves(curves)
+  }
+
+  /** Active cross-section resolution: cheap polygon live, fine polygon in trace. */
+  private get radialSegments(): number {
+    return this.displayMode === 'trace' ? this.segmentsTrace : this.segmentsLive
   }
 
   /** EXPENSIVE — new centerlines (reallocates the merged buffers). */
@@ -66,18 +77,33 @@ export class TubeSet extends THREE.Mesh implements S3Renderable {
       })
       return arr
     })
+    this.layouts = curves.map((c) => ({
+      closed: c.closed,
+      samples: c.points.length,
+      rings: c.points.length + (c.closed ? 1 : 0),
+      vertexOffset: 0,
+    }))
+    this.relayout()
+  }
+
+  /**
+   * Live/trace tessellation swap (called by App on mode changes, like the
+   * instanced bakes): rebuilds the merged buffers at the mode's resolution
+   * from the cached centerlines — the expensive math stays cached.
+   */
+  setMode(mode: 'live' | 'trace'): void {
+    if (mode === this.displayMode) return
+    this.displayMode = mode
+    if (this.segmentsLive !== this.segmentsTrace) this.relayout()
+  }
+
+  /** Recompute vertex offsets for the active resolution, then rebuild buffers. */
+  private relayout(): void {
     let offset = 0
-    this.layouts = curves.map((c) => {
-      const rings = c.points.length + (c.closed ? 1 : 0)
-      const layout: CurveLayout = {
-        closed: c.closed,
-        samples: c.points.length,
-        rings,
-        vertexOffset: offset,
-      }
-      offset += rings * (this.radialSegments + 1)
-      return layout
-    })
+    for (const layout of this.layouts) {
+      layout.vertexOffset = offset
+      offset += layout.rings * (this.radialSegments + 1)
+    }
     this.allocate(offset)
     if (this.lastProjection) this.reproject(this.lastProjection)
   }

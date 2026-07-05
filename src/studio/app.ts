@@ -49,7 +49,7 @@ export class App {
     stableNoise: false,
     renderScale: 1,
     tiles: [2, 2],
-    dynamicLowRes: true,
+    dynamicLowRes: false,
     target: null,
   }
 
