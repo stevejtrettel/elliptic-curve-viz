@@ -198,13 +198,21 @@ export function compileStudio(
   let floor: THREE.Mesh | null = null
   if (spec.backdrop && spec.backdrop.kind === 'floor') {
     const { y, size } = placeFloor(spec.backdrop, bounds)
-    // Standard (not Physical): the floor fills much of the frame — keep its
-    // raster shader cheap; the tracer handles Standard identically.
-    const mat = new THREE.MeshStandardMaterial({
-      color: spec.backdrop.color ?? 0xffffff,
-      roughness: 0.6,
-      metalness: 0,
-    })
+    // Standard (not Physical) unless clearcoat is asked for: the floor fills
+    // much of the frame — keep its raster shader cheap when possible; the
+    // tracer handles Standard identically.
+    const mat = spec.backdrop.clearcoat
+      ? new THREE.MeshPhysicalMaterial({
+          color: spec.backdrop.color ?? 0xffffff,
+          roughness: 0.5,
+          metalness: 0,
+          clearcoat: spec.backdrop.clearcoat,
+        })
+      : new THREE.MeshStandardMaterial({
+          color: spec.backdrop.color ?? 0xffffff,
+          roughness: 0.6,
+          metalness: 0,
+        })
     if (spec.backdrop.shadowCatcher) {
       ;(mat as THREE.MeshPhysicalMaterial & { matte?: boolean }).matte = true
     }

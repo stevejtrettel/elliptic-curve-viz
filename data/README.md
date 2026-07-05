@@ -1,5 +1,7 @@
 # data/ — curve descriptors
 
+> The sendable spec for Nadir lives in [EXPORT.md](EXPORT.md).
+
 `curves.json` is the catalog every demo's Curve dropdown lists, and the handoff
 contract with `ecfplat` (Nadir's Python, which computes the j ↔ (a,b,c)
 bijection). One JSON array; per curve:

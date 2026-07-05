@@ -67,6 +67,8 @@ export type LightSpec =
 export interface BackdropSpec {
   kind: 'floor' | 'none'
   color?: number
+  /** Glossy coat (0–1): bounces light back up into the subject's underside. */
+  clearcoat?: number
   /** matte shadow-catcher (invisible to camera, still occludes) for composites. */
   shadowCatcher?: boolean
   /** Content units below the stage center; 'auto' = 1.05 × radius. */

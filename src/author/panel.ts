@@ -1,7 +1,7 @@
 /**
- * The standard control tabs (Curve / Points / View) bound to a CurveScene —
- * the panel first-light hand-wired, as one call. panel.tab() is get-or-create,
- * so demos freely append their own tabs/controls to the same panel.
+ * The standard control tabs (Curve / Points / View) bound to a CurveScene,
+ * as one call. panel.tab() is get-or-create, so demos freely append their
+ * own tabs/controls to the same panel.
  */
 import type { Candidate } from '@/math/families'
 

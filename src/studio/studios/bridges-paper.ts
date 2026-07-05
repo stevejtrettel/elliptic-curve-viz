@@ -33,7 +33,9 @@ export const bridgesPaper: StudioSpec = {
     { kind: 'directional', role: 'preview key', intensity: 1, position: [0.5, 2, 0.3], previewOnly: true },
     { kind: 'ambient', role: 'preview ambient', intensity: 0.35, previewOnly: true },
   ],
-  backdrop: { kind: 'floor', color: 0xffffff, y: 'auto', size: 'auto' },
-  camera: { fov: 50, azimuth: 3.13, elevation: 1.45, fill: 0.72 },
+  // legacy ground: white with clearcoat 1 — the gloss bounce fills the
+  // torus underside (the paper figures' soft look)
+  backdrop: { kind: 'floor', color: 0xffffff, clearcoat: 1, y: 'auto', size: 'auto' },
+  camera: { fov: 50, azimuth: 2.36, elevation: 1.556, fill: 0.72 },
   look: { toneMapping: 'aces', exposure: 1 },
 }

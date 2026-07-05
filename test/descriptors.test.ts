@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { CURVES } from '@/author'
-import { describeCurve, parseCurveDescriptors } from '@/io'
+import { describeCurve, parseCurveDescriptors, parsePresentation } from '@/io'
 
 const VALID = { p: 11, trace: 6, sign: 1, form: { a: 1, b: 0, c: 2 } }
 
@@ -51,5 +51,21 @@ describe('parseCurveDescriptors', () => {
   it('parses the optional Weierstrass equation', () => {
     const [lc] = parseCurveDescriptors([{ ...VALID, equation: { f: 1, g: 2 } }])
     expect(lc!.data.equation).toEqual({ f: 1n, g: 2n })
+  })
+})
+
+describe('parsePresentation', () => {
+  it('parses a label → style map with hex colors and integer-k radii', () => {
+    const p = parsePresentation({
+      'disc −3': { profile: { a: 0.276, b: 1.9, n: 3 }, color: '0x43a33b', radiusByK: { '2': 0.075 } },
+    })
+    expect(p['disc −3']!.color).toBe(0x43a33b)
+    expect(p['disc −3']!.profile).toEqual({ a: 0.276, b: 1.9, n: 3 })
+    expect(p['disc −3']!.radiusByK).toEqual({ 2: 0.075 })
+  })
+
+  it('rejects non-object input and malformed styles with the offending label', () => {
+    expect(() => parsePresentation([])).toThrow(/object/)
+    expect(() => parsePresentation({ x: { surface: 'shiny' } })).toThrow(/presentation\["x"\]/)
   })
 })

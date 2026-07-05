@@ -19,8 +19,6 @@ import { Complex } from '@/math/core'
 import type { Candidate } from '@/math/families'
 import { DiscreteCurve, HopfTorus, type ProfileCurve } from '@/math/hopf'
 
-import type { CameraSpec } from '@/studio'
-
 import type { LabeledCurve } from './catalog'
 
 /** The legacy wavy family, sampled exactly (512 uniform samples, spectral-safe). */
@@ -54,21 +52,20 @@ export function paperProfile(lc: LabeledCurve): DiscreteCurve | null {
   return p ? legacyWavy(p.a, p.b, p.n) : null
 }
 
-/** The paper's base point radius for F_{p^k}: exact table entry, else nearest k. */
+/**
+ * The paper's base point radius for F_{p^k}: exact table entry, else nearest k.
+ * The returned value is DOUBLED relative to the stored legacy radius: legacy
+ * boosts by 1+|q|² = 2/(1−w) while PointCloud boosts by scaleFactor/2 =
+ * 1/(1−w) — same conformal law, half the constant — so 2× the base radius
+ * reproduces the paper's sizes exactly, pointwise.
+ */
 export function paperRadius(lc: LabeledCurve, k: number, fallback = 0.035): number {
   const table = lc.paper?.radiusByK
   if (!table || Object.keys(table).length === 0) return fallback
-  if (table[k] !== undefined) return table[k]
+  if (table[k] !== undefined) return 2 * table[k]
   const nearest = Object.keys(table)
     .map(Number)
     .sort((a, b) => Math.abs(a - k) - Math.abs(b - k))[0]!
-  return table[nearest]!
+  return 2 * table[nearest]!
 }
 
-/** The paper's two camera rigs (lifting-modp scene files). */
-export const CAMERA_RIGS = {
-  // camera.position = (0.1, 10, −0.1), lookAt origin
-  top: { azimuth: 3.13, elevation: 1.45, fill: 0.72, fov: 50 },
-  // camera.position = (1, 2.2, −5)
-  threequarter: { azimuth: 2.94, elevation: 0.41, fill: 0.72, fov: 50 },
-} satisfies Record<string, Partial<CameraSpec>>

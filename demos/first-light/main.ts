@@ -1,8 +1,9 @@
 /**
- * first-light — the milestone demo (DESIGN.md §11): a glass Hopf torus with
- * the exact points of E(F_{p^k}), tubes, orbit picking, flat domain, and the
- * paper-white studio. Since the authoring layer (§7.5) this IS the standard
- * kit; URL params (?curve&k&fibers&grid&domain&lobes&trace&blocktrace) as before.
+ * first-light — the exploratory playground: every feature of the authoring
+ * layer's standard kit. Orbit picking (click a point → its Frobenius orbit),
+ * fiber/gridline tubes, the flat fundamental domain, color by structure,
+ * S³ rotation and pole sliders, studio picker + path tracing.
+ * URL params: ?curve&k&lobes&fibers&grid&domain&studio&design&trace&blocktrace.
  */
 import { showCurve } from '@/author'
 

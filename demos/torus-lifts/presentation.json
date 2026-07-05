@@ -1,0 +1,40 @@
+{
+  "disc −8 · rectangular (paper example)": {
+    "color": "0xcc8d04",
+    "surface": "opaque",
+    "radiusByK": { "1": 0.05, "2": 0.045, "3": 0.025, "4": 0.0075 }
+  },
+  "disc −3 · hexagonal": {
+    "profile": { "a": 0.276, "b": 1.9, "n": 3 },
+    "color": "0x43a33b",
+    "surface": "opaque",
+    "radiusByK": { "1": 0.05, "2": 0.075, "3": 0.04, "4": 0.025, "5": 0.009 }
+  },
+  "disc −4 · square": {
+    "color": "0xd43b3b",
+    "surface": "opaque",
+    "radiusByK": { "1": 0.05, "2": 0.05, "3": 0.05, "4": 0.03, "5": 0.015 }
+  },
+  "disc −7": {
+    "profile": { "a": 0.1179, "b": 3.89, "n": 7 },
+    "color": "0x3478e3",
+    "surface": "opaque",
+    "radiusByK": { "1": 0.1, "2": 0.05, "3": 0.035, "4": 0.01 }
+  },
+  "disc −11": {
+    "profile": { "a": 0.07, "b": 5.705, "n": 11 },
+    "color": "0x7d46bd",
+    "surface": "opaque",
+    "radiusByK": { "1": 0.1, "2": 0.075, "3": 0.05, "4": 0.03, "5": 0.02, "6": 0.01 }
+  },
+  "disc −20 · form (1,0,5)": {
+    "color": "0xd43b3b",
+    "surface": "glass",
+    "radiusByK": { "2": 0.01 }
+  },
+  "disc −20 · form (2,2,3)": {
+    "profile": { "a": 0.2, "b": 2.2, "n": 5 },
+    "color": "0xd43b3b",
+    "radiusByK": { "2": 0.0145 }
+  }
+}

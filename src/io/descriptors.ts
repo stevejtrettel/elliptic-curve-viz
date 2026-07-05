@@ -87,6 +87,23 @@ function parseDescriptor(entry: unknown, i: number): LabeledCurve {
   return { label: label ?? describeCurve(data), data, ...(paper ? { paper } : {}) }
 }
 
+/**
+ * Parse a standalone presentation map: curve label → PaperStyle. This is the
+ * RENDERER-side file (our aesthetics: profile parameters, colors, radii) —
+ * deliberately separate from the arithmetic descriptors ecfplat exports.
+ */
+export function parsePresentation(json: unknown): Record<string, PaperStyle> {
+  if (typeof json !== 'object' || json === null || Array.isArray(json)) {
+    throw new Error('presentation: expected an object mapping curve label → style')
+  }
+  const out: Record<string, PaperStyle> = {}
+  for (const [label, raw] of Object.entries(json)) {
+    const p = parsePaper(raw, `presentation["${label}"]`)
+    if (p) out[label] = p
+  }
+  return out
+}
+
 function parsePaper(raw: unknown, at: string): PaperStyle | undefined {
   if (raw === undefined) return undefined
   if (typeof raw !== 'object' || raw === null) throw new Error(`${at}.paper: expected an object`)
