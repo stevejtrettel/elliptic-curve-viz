@@ -6,5 +6,10 @@
   { "label": "disc −11", "p": 5, "trace": 3, "sign": 1, "form": { "a": 1, "b": 1, "c": 3 } },
   { "label": "disc −20 · form (1,0,5)", "p": 41, "trace": 12, "sign": 1, "form": { "a": 1, "b": 0, "c": 5 } },
   { "label": "disc −20 · form (2,2,3)", "p": 41, "trace": 12, "sign": 1, "form": { "a": 2, "b": 2, "c": 3 } },
-  { "label": "disc −28 = −7·2²", "p": 11, "trace": 4, "sign": 1, "form": { "a": 1, "b": 0, "c": 7 } }
+  { "label": "disc −28 = −7·2²", "p": 11, "trace": 4, "sign": 1, "form": { "a": 1, "b": 0, "c": 7 } },
+  { "label": "disc −20 · p=5 · form (1,0,5)", "p": 5, "trace": 0, "sign": 1, "form": { "a": 1, "b": 0, "c": 5 }, "equation": { "f": 0, "g": 2 } },
+  { "label": "disc −20 · p=5 · form (2,2,3)", "p": 5, "trace": 0, "sign": 1, "form": { "a": 2, "b": 2, "c": 3 }, "equation": { "f": 0, "g": 1 } },
+  { "label": "disc −19 · p=5 · form (1,1,5)", "p": 5, "trace": 1, "sign": 1, "form": { "a": 1, "b": 1, "c": 5 }, "equation": { "f": 3, "g": 3 } },
+  { "label": "disc −4 · p=5 · form (1,0,1)", "p": 5, "trace": 2, "sign": 1, "form": { "a": 1, "b": 0, "c": 1 }, "equation": { "f": 1, "g": 0 } },
+  { "label": "disc −16 · p=5 · form (1,0,4)", "p": 5, "trace": 2, "sign": 1, "form": { "a": 1, "b": 0, "c": 4 }, "equation": { "f": 1, "g": 3 } }
 ]
