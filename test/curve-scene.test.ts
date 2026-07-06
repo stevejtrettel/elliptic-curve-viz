@@ -110,7 +110,7 @@ describe('CurveScene Cayley graph', () => {
     cs.setCayley(true)
     expect(cs.scene).toBe(scene) // tubes stage: scene identity kept
     cs.cayleyTubes.forEach((_, i) => {
-      if (scene.E.generators[i]) expect(tubeCount(cs, i)).toBeGreaterThan(0)
+      if (cs.cayleyGenerators[i]) expect(tubeCount(cs, i)).toBeGreaterThan(0)
       else expect(tubeCount(cs, i)).toBe(0)
     })
     cs.setCayley(false)
@@ -142,10 +142,25 @@ describe('CurveScene Cayley graph', () => {
     const cs = new CurveScene({ cayley: true, k: 2 })
     cs.setK(1)
     expect(cs.cayley).toEqual([0, 1])
-    const E = cs.scene.E
     cs.cayleyTubes.forEach((_, i) => {
-      if (E.generators[i]) expect(tubeCount(cs, i)).toBeGreaterThan(0)
+      if (cs.cayleyGenerators[i]) expect(tubeCount(cs, i)).toBeGreaterThan(0)
     })
+  })
+
+  it('cyclic groups draw exactly one Hamiltonian cycle, in the shortest direction', () => {
+    // disc −8 at k = 3: E ≅ ℤ/1314 — minimal generating set is ONE element;
+    // reduced picks the shortest full-order point (structure picks the SNF one)
+    const cs = new CurveScene({ k: 3, cayley: true })
+    const E = cs.scene.E
+    expect(E.generators.length).toBe(1)
+    expect(cs.cayleyGenerators.length).toBe(1)
+    expect(E.order(cs.cayleyGenerators[0]!)).toBe(E.size)
+    expect(tubeCount(cs, 0)).toBeGreaterThan(0)
+    expect(tubeCount(cs, 1)).toBe(0)
+    cs.setCayleyBasis('structure')
+    expect(cs.cayleyGenerators).toEqual(E.generators)
+    expect(tubeCount(cs, 0)).toBeGreaterThan(0)
+    expect(tubeCount(cs, 1)).toBe(0)
   })
 })
 

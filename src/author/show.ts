@@ -23,7 +23,13 @@ import {
 } from '@/studio'
 
 import type { LabeledCurve } from './catalog'
-import { type CayleySelection, type ColorMode, CurveScene, type ViewAngles } from './curve-scene'
+import {
+  type CayleyBasis,
+  type CayleySelection,
+  type ColorMode,
+  CurveScene,
+  type ViewAngles,
+} from './curve-scene'
 import { addCurveTabs, candidateLabel } from './panel'
 import { enableOrbitPicking } from './pick'
 import { decodeParams } from './url'
@@ -52,6 +58,8 @@ export interface CurveDemoSpec {
   gridlines?: number
   /** Cayley-graph edges: true = both generators, or explicit indices ([0], [1]). */
   cayley?: CayleySelection
+  /** Cayley generating pair: 'reduced' shortest (default) or 'structure' SNF. */
+  cayleyBasis?: CayleyBasis
   tubeRadius?: number
   pointRadius?: number
   colorBy?: ColorMode
@@ -72,6 +80,9 @@ export interface CurveDemoSpec {
   interaction?: boolean
   urlSync?: boolean
   fps?: boolean
+  /** Fired after every completed scene recompute (curve/k/… changes) — for
+   *  demos keeping labels or custom UI in sync with the live state. */
+  onChange?: () => void
 }
 
 export interface CurveDemo {
@@ -98,6 +109,7 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
     fibers: url.fibers ?? spec.fibers ?? 0,
     gridlines: url.grid ?? spec.gridlines ?? 0,
     cayley: url.cayley ?? spec.cayley ?? false,
+    ...(spec.cayleyBasis ? { cayleyBasis: spec.cayleyBasis } : {}),
     maxPoints: spec.maxPoints ?? 20000,
     pointRadius: spec.pointRadius ?? 0.035,
     tubeRadius: spec.tubeRadius ?? 0.012,
@@ -106,7 +118,10 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
     subfieldBoost: spec.subfieldBoost ?? true,
     ...(spec.profile ? { profile: spec.profile } : {}),
     ...(spec.view ? { view: spec.view } : {}),
-    onChange: () => app.invalidate(),
+    onChange: () => {
+      app.invalidate()
+      spec.onChange?.()
+    },
   })
   const torus = url.torus ?? spec.torus ?? 'glass'
   if (torus === 'matte') scene.torus.setMaterial(matte(0xdde3ea))

@@ -147,6 +147,18 @@ export function addCurveTabs(panel: ControlPanel, scene: CurveScene, opts: Stand
     (v) => scene.setCayley(v === 'off' ? [] : v === 'g1' ? [0] : v === 'g2' ? [1] : true),
   )
 
+  viewTab.dropdown(
+    'Cayley basis',
+    {
+      options: [
+        { label: 'shortest (reduced)', value: 'reduced' },
+        { label: 'structure (SNF)', value: 'structure' },
+      ],
+      value: scene.cayleyBasis,
+    },
+    (v) => scene.setCayleyBasis(v as 'reduced' | 'structure'),
+  )
+
   viewTab.slider('Tube radius', { min: 0.004, max: 0.05, step: 0.002, value: opts.tubeRadius ?? 0.012 }, (v) => {
     scene.fiberTubes.setRadius(v)
     scene.edgeTubes.setRadius(v)

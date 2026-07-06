@@ -595,6 +595,8 @@ Each phase ends with something visible and testable; plans reviewed before codin
 | 2026-07-04 | `data/curves.json` descriptor list = the ecfplat handoff contract and the demo catalog (single source, parsed+validated at import); j↔(a,b,c) bijection stays Python-side |
 | 2026-07-04 | Studio design workflow: picker in Studio tab (registry swap), opt-in Design tab edits spec data live via setStudio recompile, "Copy spec" serializes a preset module; second built-in studio velvet-dark |
 | 2026-07-06 | Cayley graphs of E(F_{p^k}) for the SNF generators: `cosets(g)` on CurvePoints (math); edges rendered per generator as the \|E\|/order(g) ⟨g⟩-coset cycles, each a CLOSED GEODESIC of ℂ/Λ (adding g = translation by the constant λ·g) — `cayleyCurves` in author, one TubeSet per generator (g₁ green, g₂ purple), `cayley` in CurveScene/showCurve/`?cayley=g1\|g2\|both` |
+| 2026-07-06 | Flat picture: `flat` = CANONICAL fundamental-domain representative (was the (λ, λτ)-cell — points spilled off the plaque); Cayley chords on DomainPlaque (`setLines` ribbon layer, wall-clipped per coset); coset color modes coset1/coset2 |
+| 2026-07-06 | Cayley generating set DEFAULTS to the shortest MINIMAL one — rank(E) elements (`reducedGenerators`): cyclic → the shortest full-order point (one tight Hamiltonian cycle); rank 2 → reduced basis of the preimage lattice {v : v mod N ∈ E} (nearest-neighbor edges). SNF 'structure' basis selectable (CurveScene `cayleyBasis`, panel dropdown); coset colors follow the same set; `showCurve` gains `onChange` so demo About-tabs stay live |
 
 ## 13. Open questions
 

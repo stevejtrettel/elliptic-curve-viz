@@ -17,7 +17,7 @@
  * renderables directly. Selection is the one shortcut: select() swaps only
  * the orbit tube, then reruns style → project (fiber/edge tubes untouched).
  */
-import type { CurveData } from '@/math/arithmetic'
+import type { CurveData, TorusPoint } from '@/math/arithmetic'
 import { tauOf } from '@/math/arithmetic'
 import { Quaternion, Vec4 } from '@/math/core'
 import type { Candidate } from '@/math/families'
@@ -43,7 +43,7 @@ import {
 import { type LabeledCurve, CURVES, resolveCurve } from './catalog'
 import { profileCandidate } from './figures'
 import { cayleyCurves, cayleyFlatSegments, edgeCurves, fiberCurves, orbitCurve } from './grid-curves'
-import { type TorusScene, buildTorusScene, maxFeasibleK } from './torus-scene'
+import { type TorusScene, buildTorusScene, maxFeasibleK, reducedGenerators } from './torus-scene'
 
 /** 'coset1'/'coset2' color by coset of ⟨g₁⟩/⟨g₂⟩ — the Cayley geodesics. */
 export type ColorMode = 'degree' | 'order' | 'orbit' | 'coset1' | 'coset2' | 'uniform'
@@ -70,6 +70,15 @@ function cayleyIndices(sel: CayleySelection): number[] {
   return sel === true ? [0, 1] : sel === false ? [] : sel
 }
 
+/**
+ * Which generating pair the Cayley graph (and coset colors) uses:
+ * 'reduced' — shortest basis of the preimage lattice, nearest-neighbor edges
+ *             (the default; see reducedGenerators);
+ * 'structure' — the SNF generators of ℤ/n₁ × ℤ/n₂ (canonical, but a cyclic
+ *               group's single geodesic then winds |E| steps over the torus).
+ */
+export type CayleyBasis = 'reduced' | 'structure'
+
 export interface CurveSceneOptions {
   curve?: number | string | CurveData
   /** Catalog the curve reference resolves against (and the panel lists). */
@@ -81,6 +90,8 @@ export interface CurveSceneOptions {
   gridlines?: number
   /** Cayley-graph edges: true = both generators, or explicit indices ([0], [1]). */
   cayley?: CayleySelection
+  /** Generating pair for Cayley edges and coset colors (default 'reduced'). */
+  cayleyBasis?: CayleyBasis
   maxPoints?: number
   pointRadius?: number
   tubeRadius?: number
@@ -107,6 +118,7 @@ export interface CurveSceneUpdate {
   fibers?: number
   gridlines?: number
   cayley?: CayleySelection
+  cayleyBasis?: CayleyBasis
   colorMode?: ColorMode
   color?: number
   subfieldBoost?: boolean
@@ -138,6 +150,9 @@ export class CurveScene {
   private _fibers: number
   private _gridlines: number
   private _cayley: number[]
+  private _cayleyBasis: CayleyBasis = 'reduced'
+  /** The generating pair Cayley edges & coset colors use (set at build). */
+  private _displayGens: TorusPoint[] = []
   private _colorMode: ColorMode = 'degree'
   private _color = 0xd43b3b
   private _profile: ProfileCurve | null = null
@@ -155,6 +170,7 @@ export class CurveScene {
     this._fibers = opts.fibers ?? 0
     this._gridlines = opts.gridlines ?? 0
     this._cayley = cayleyIndices(opts.cayley ?? false)
+    this._cayleyBasis = opts.cayleyBasis ?? 'reduced'
     this._colorMode = opts.colorMode ?? 'degree'
     this._color = opts.color ?? 0xd43b3b
     this._profile = opts.profile ?? null
@@ -215,6 +231,13 @@ export class CurveScene {
   get cayley(): number[] {
     return [...this._cayley]
   }
+  get cayleyBasis(): CayleyBasis {
+    return this._cayleyBasis
+  }
+  /** The generating pair Cayley edges and coset colors use (per cayleyBasis). */
+  get cayleyGenerators(): TorusPoint[] {
+    return [...this._displayGens]
+  }
   get colorMode(): ColorMode {
     return this._colorMode
   }
@@ -261,6 +284,11 @@ export class CurveScene {
   /** Cayley-graph edges: true = both generators, or explicit indices ([0], [1]). */
   setCayley(sel: CayleySelection): void {
     this.update({ cayley: sel })
+  }
+
+  /** Switch the Cayley generating pair: 'reduced' (shortest) or 'structure' (SNF). */
+  setCayleyBasis(basis: CayleyBasis): void {
+    this.update({ cayleyBasis: basis })
   }
 
   setColorMode(m: ColorMode): void {
@@ -319,6 +347,10 @@ export class CurveScene {
     if (u.cayley !== undefined) {
       this._cayley = cayleyIndices(u.cayley)
       touch('tubes')
+    }
+    if (u.cayleyBasis !== undefined) {
+      this._cayleyBasis = u.cayleyBasis
+      touch('tubes') // display generators are recomputed at the tubes stage
     }
     if (u.colorMode !== undefined) {
       this._colorMode = u.colorMode
@@ -416,14 +448,15 @@ export class CurveScene {
   }
 
   private stageTubes(): void {
-    const { hopf, E, lambda, flip } = this._scene
+    const { hopf, E, lambda, flip, unit } = this._scene
     this.fiberTubes.setCurves(this._fibers > 0 ? fiberCurves(hopf, this._fibers) : [])
     this.edgeTubes.setCurves(this._gridlines > 0 ? edgeCurves(hopf, this._gridlines) : [])
+    this._displayGens = this._cayleyBasis === 'structure' ? E.generators : reducedGenerators(E, unit)
     // |E| edges per generator regardless of coset structure — spend fewer
     // samples per edge as the group grows (adjacent points are closer)
     const samplesPerEdge = Math.max(3, Math.min(12, Math.ceil(60000 / E.size)))
     this.cayleyTubes.forEach((tube, i) => {
-      const g = E.generators[i]
+      const g = this._displayGens[i]
       tube.setCurves(
         this._cayley.includes(i) && g ? cayleyCurves(E, g, lambda, hopf, flip, samplesPerEdge) : [],
       )
@@ -431,9 +464,9 @@ export class CurveScene {
     // the same geodesics on the flat picture: parallel chords per generator
     this.plaque.setLines(
       this._cayley
-        .filter((i) => E.generators[i])
+        .filter((i) => this._displayGens[i])
         .map((i) => ({
-          segments: cayleyFlatSegments(E, E.generators[i]!, this._scene.flat, hopf.lattice),
+          segments: cayleyFlatSegments(E, this._displayGens[i]!, this._scene.flat, hopf.lattice),
           color: CAYLEY_COLORS[i]!,
         })),
     )
@@ -442,10 +475,10 @@ export class CurveScene {
 
   private stageStyle(): void {
     const { E } = this._scene
-    // coset modes: fall back to the last generator when g₂ doesn't exist
-    // (cyclic groups), and to the identity for the trivial group
+    // coset modes use the SAME generators as the Cayley edges; fall back to
+    // the last one when g₂ doesn't exist, the identity for the trivial group
     const cosetGen = (i: number) =>
-      E.generators[i] ?? E.generators[E.generators.length - 1] ?? E.identity
+      this._displayGens[i] ?? this._displayGens[this._displayGens.length - 1] ?? E.identity
     const colors =
       this._colorMode === 'uniform'
         ? uniformColors(E.size, this._color)

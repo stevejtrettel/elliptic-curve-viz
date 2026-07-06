@@ -139,15 +139,24 @@ describe('cayleyFlatSegments', () => {
     }
   })
 
-  it('the chords thread the beads: every flat point lies on a chord', () => {
+  it('the chords thread the beads: every flat point lies on a chord MOD Λ', () => {
+    // mod Λ: a bead sitting exactly on a wall/corner is drawn at one
+    // representative while its chord stubs attach at an equivalent one
+    // (e.g. the identity at (0,0) vs seam pieces ending at (1,0)/(0,1)) —
+    // correct on the torus, a representative choice in the flat picture
+    const [w1, w2] = lattice
     for (const z of scene.flat) {
       let best = Infinity
       for (const [p, q] of segments) {
         const d = q.sub(p)
         const len2 = d.re * d.re + d.im * d.im
-        const t = Math.max(0, Math.min(1, ((z.re - p.re) * d.re + (z.im - p.im) * d.im) / len2))
-        const dist = Math.hypot(z.re - p.re - t * d.re, z.im - p.im - t * d.im)
-        best = Math.min(best, dist)
+        for (let na = -1; na <= 1; na++) {
+          for (let nb = -1; nb <= 1; nb++) {
+            const zt = z.add(w1.scale(na)).add(w2.scale(nb))
+            const t = Math.max(0, Math.min(1, ((zt.re - p.re) * d.re + (zt.im - p.im) * d.im) / len2))
+            best = Math.min(best, Math.hypot(zt.re - p.re - t * d.re, zt.im - p.im - t * d.im))
+          }
+        }
       }
       expect(best).toBeLessThan(1e-6)
     }
