@@ -28,8 +28,29 @@ export interface PlaqueLineSet {
   width?: number
 }
 
-/** Ribbons float just above the plaque face, below the point spheres. */
-const LINE_Z = 0.002
+/** Thin-tube styling for the outline / grid layers (lifting-modp's FD look). */
+export interface PlaqueTubeOptions {
+  /** Tube radius in the plaque's normalized units. */
+  radius?: number
+  color?: number
+}
+
+/** Interior gridlines: u × v cells (lines at a = i/u, b = j/v, walls excluded). */
+export interface PlaqueGridOptions extends PlaqueTubeOptions {
+  u: number
+  v: number
+}
+
+/**
+ * Ribbons float just above the plaque face AND above the outline/grid tube
+ * tops (defaults below), still well under the point spheres — the colored
+ * chords are content, the gray tubes are dressing.
+ */
+const LINE_Z = 0.005
+
+const OUTLINE_RADIUS = 0.006
+const GRID_RADIUS = 0.0035
+const TUBE_COLOR = 0x8a919a
 
 export class DomainPlaque extends THREE.Group {
   private lattice: [Complex, Complex]
@@ -41,6 +62,10 @@ export class DomainPlaque extends THREE.Group {
   private spheres: THREE.InstancedMesh
   private lineSets: PlaqueLineSet[] = []
   private lineMeshes: THREE.Mesh[] = []
+  private outlineOpts: PlaqueTubeOptions | null = null
+  private gridOpts: PlaqueGridOptions | null = null
+  private outlineGroup: THREE.Group | null = null
+  private gridGroup: THREE.Group | null = null
   private readonly dummy = new THREE.Object3D()
   private readonly baker = new TraceBaker(this, () => this.spheres)
 
@@ -70,13 +95,28 @@ export class DomainPlaque extends THREE.Group {
     this.lattice = lattice
     this.rebuildPlaque()
     this.placePoints()
-    this.rebuildLines() // scaleNorm may have changed
+    // scaleNorm may have changed — every derived layer follows
+    this.rebuildLines()
+    this.rebuildOutline()
+    this.rebuildGrid()
   }
 
   /** Replace the line families drawn on the plaque ([] clears them). */
   setLines(sets: PlaqueLineSet[]): void {
     this.lineSets = sets
     this.rebuildLines()
+  }
+
+  /** Thin tubes along the four walls of the fundamental domain (null removes). */
+  setOutline(opts: PlaqueTubeOptions | null): void {
+    this.outlineOpts = opts
+    this.rebuildOutline()
+  }
+
+  /** Interior grid of thin tubes at a = i/u, b = j/v (null removes). */
+  setGrid(opts: PlaqueGridOptions | null): void {
+    this.gridOpts = opts
+    this.rebuildGrid()
   }
 
   setPoints(points: Complex[], colors?: Float32Array, sizes?: number[] | null): void {
@@ -107,6 +147,12 @@ export class DomainPlaque extends THREE.Group {
 
   setSizes(sizes: number[] | null): void {
     this.sizes = sizes
+    this.placePoints()
+  }
+
+  /** Cheap: uniform bead radius (multiplied by the per-point sizes array). */
+  setPointRadius(r: number): void {
+    this.pointRadius = r
     this.placePoints()
   }
 
@@ -163,6 +209,96 @@ export class DomainPlaque extends THREE.Group {
     }
   }
 
+  /**
+   * One layer of thin cylinders along in-plane segments (+ optional sphere
+   * joints), sharing one unit geometry and one material — cheap to rebuild,
+   * plain meshes so the path tracer takes them as-is.
+   */
+  private buildTubeLayer(
+    segments: [Complex, Complex][],
+    joints: Complex[],
+    radius: number,
+    color: number,
+  ): THREE.Group {
+    const group = new THREE.Group()
+    const cyl = new THREE.CylinderGeometry(1, 1, 1, 12, 1)
+    const sph = new THREE.SphereGeometry(1, 12, 8)
+    const material = colored(color)
+    for (const [p, q] of segments) {
+      const [px, py] = this.toLocal(p)
+      const [qx, qy] = this.toLocal(q)
+      const len = Math.hypot(qx - px, qy - py)
+      if (len === 0) continue
+      const mesh = new THREE.Mesh(cyl, material)
+      mesh.scale.set(radius, len, radius)
+      mesh.position.set((px + qx) / 2, (py + qy) / 2, 0)
+      mesh.rotation.z = Math.atan2(qy - py, qx - px) - Math.PI / 2 // cylinder axis is local y
+      group.add(mesh)
+    }
+    for (const j of joints) {
+      const [x, y] = this.toLocal(j)
+      const mesh = new THREE.Mesh(sph, material)
+      mesh.scale.setScalar(radius)
+      mesh.position.set(x, y, 0)
+      group.add(mesh)
+    }
+    return group
+  }
+
+  private disposeTubeLayer(group: THREE.Group | null): void {
+    if (!group) return
+    this.remove(group)
+    const seen = new Set<THREE.BufferGeometry | THREE.Material>()
+    group.traverse((o) => {
+      if (o instanceof THREE.Mesh) {
+        seen.add(o.geometry)
+        seen.add(o.material as THREE.Material)
+      }
+    })
+    for (const r of seen) r.dispose()
+  }
+
+  private rebuildOutline(): void {
+    this.disposeTubeLayer(this.outlineGroup)
+    this.outlineGroup = null
+    if (!this.outlineOpts) return
+    const [w1, w2] = this.lattice
+    const zero = new Complex(0, 0)
+    const corners = [zero, w1, w1.add(w2), w2]
+    const walls: [Complex, Complex][] = corners.map((c, i) => [c, corners[(i + 1) % 4]!])
+    this.outlineGroup = this.buildTubeLayer(
+      walls,
+      corners, // sphere joints seal the four corners
+      this.outlineOpts.radius ?? OUTLINE_RADIUS,
+      this.outlineOpts.color ?? TUBE_COLOR,
+    )
+    this.add(this.outlineGroup)
+  }
+
+  private rebuildGrid(): void {
+    this.disposeTubeLayer(this.gridGroup)
+    this.gridGroup = null
+    if (!this.gridOpts) return
+    const { u, v } = this.gridOpts
+    const [w1, w2] = this.lattice
+    const segments: [Complex, Complex][] = []
+    for (let i = 1; i < u; i++) {
+      const a = w1.scale(i / u)
+      segments.push([a, a.add(w2)]) // parallel to ω₂
+    }
+    for (let j = 1; j < v; j++) {
+      const b = w2.scale(j / v)
+      segments.push([b, b.add(w1)]) // parallel to ω₁
+    }
+    this.gridGroup = this.buildTubeLayer(
+      segments,
+      [],
+      this.gridOpts.radius ?? GRID_RADIUS,
+      this.gridOpts.color ?? TUBE_COLOR,
+    )
+    this.add(this.gridGroup)
+  }
+
   private placePoints(): void {
     for (let i = 0; i < this.points.length; i++) {
       const [x, y] = this.toLocal(this.points[i]!)
@@ -186,6 +322,10 @@ export class DomainPlaque extends THREE.Group {
     this.baker.dispose()
     this.lineSets = []
     this.rebuildLines()
+    this.disposeTubeLayer(this.outlineGroup)
+    this.disposeTubeLayer(this.gridGroup)
+    this.outlineGroup = null
+    this.gridGroup = null
     this.remove(this.plaque, this.spheres)
     this.plaque.geometry.dispose()
     ;(this.plaque.material as THREE.Material).dispose()

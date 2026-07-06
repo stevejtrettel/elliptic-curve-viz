@@ -31,6 +31,10 @@ const demo = showCurve({
   onChange: () => refresh(), // keep the About tab honest across curve/k changes
 })
 
+// flat-domain dressing: wall outline always; a grid through the N-torsion
+// spacing when it is coarse enough to read (every point sits on a crossing)
+demo.scene.plaque.setOutline({})
+
 // what you are looking at — LIVE, recomputed on every curve/k/basis change
 const about = demo.panel?.tab('About')
 const group = about?.label('Group')
@@ -58,6 +62,7 @@ function refresh(): void {
   }
   gen1?.set(describe(0))
   gen2?.set(describe(1))
+  scene.plaque.setGrid(E.N <= 32 ? { u: E.N, v: E.N } : null)
 }
 refresh()
 

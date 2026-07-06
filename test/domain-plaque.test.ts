@@ -68,6 +68,39 @@ describe('DomainPlaque', () => {
     expect(plaque.children.length).toBe(base)
   })
 
+  it('setOutline draws the four walls with corner joints; null removes', () => {
+    const plaque = new DomainPlaque(LATTICE, [])
+    const base = plaque.children.length
+    plaque.setOutline({ radius: 0.01 })
+    expect(plaque.children.length).toBe(base + 1)
+    const group = plaque.children[base] as THREE.Group
+    expect(group.children.length).toBe(8) // 4 wall tubes + 4 corner spheres
+    // wall tubes span the parallelogram sides (normalized): |ω₁|·s = 1
+    const wall = group.children[0] as THREE.Mesh
+    expect(wall.scale.y).toBeCloseTo(1, 6)
+    plaque.setOutline(null)
+    expect(plaque.children.length).toBe(base)
+  })
+
+  it('setGrid draws interior lines only: (u−1) + (v−1) tubes', () => {
+    const plaque = new DomainPlaque(LATTICE, [])
+    const base = plaque.children.length
+    plaque.setGrid({ u: 4, v: 3 })
+    const group = plaque.children[base] as THREE.Group
+    expect(group.children.length).toBe(3 + 2)
+    plaque.setGrid(null)
+    expect(plaque.children.length).toBe(base)
+  })
+
+  it('outline and grid survive a lattice change (rebuilt to the new shape)', () => {
+    const plaque = new DomainPlaque(LATTICE, [])
+    plaque.setOutline({})
+    plaque.setGrid({ u: 2, v: 2 })
+    const count = plaque.children.length
+    plaque.setLattice([new Complex(1, 0), new Complex(0.2, 0.9)])
+    expect(plaque.children.length).toBe(count)
+  })
+
   it('setLattice rescales the plaque', () => {
     const plaque = new DomainPlaque(LATTICE, [])
     plaque.setLattice([new Complex(1, 0), new Complex(0, 0.5)])
