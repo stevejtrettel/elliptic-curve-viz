@@ -23,7 +23,7 @@ import {
 } from '@/studio'
 
 import type { LabeledCurve } from './catalog'
-import { type ColorMode, CurveScene, type ViewAngles } from './curve-scene'
+import { type CayleySelection, type ColorMode, CurveScene, type ViewAngles } from './curve-scene'
 import { addCurveTabs, candidateLabel } from './panel'
 import { enableOrbitPicking } from './pick'
 import { decodeParams } from './url'
@@ -50,6 +50,8 @@ export interface CurveDemoSpec {
   camera?: Partial<CameraSpec>
   fibers?: number
   gridlines?: number
+  /** Cayley-graph edges: true = both generators, or explicit indices ([0], [1]). */
+  cayley?: CayleySelection
   tubeRadius?: number
   pointRadius?: number
   colorBy?: ColorMode
@@ -95,6 +97,7 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
     embedding: spec.embedding ?? 0,
     fibers: url.fibers ?? spec.fibers ?? 0,
     gridlines: url.grid ?? spec.gridlines ?? 0,
+    cayley: url.cayley ?? spec.cayley ?? false,
     maxPoints: spec.maxPoints ?? 20000,
     pointRadius: spec.pointRadius ?? 0.035,
     tubeRadius: spec.tubeRadius ?? 0.012,
@@ -105,8 +108,9 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
     ...(spec.view ? { view: spec.view } : {}),
     onChange: () => app.invalidate(),
   })
-  if (spec.torus === 'matte') scene.torus.setMaterial(matte(0xdde3ea))
-  if (spec.torus === false) scene.torus.visible = false
+  const torus = url.torus ?? spec.torus ?? 'glass'
+  if (torus === 'matte') scene.torus.setMaterial(matte(0xdde3ea))
+  if (torus === false) scene.torus.visible = false
   if (spec.showPoints === false) scene.points.visible = false
   app.stage.add(scene.group)
 
@@ -137,7 +141,7 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
       domainShown,
       pointRadius: spec.pointRadius ?? 0.035,
       tubeRadius: spec.tubeRadius ?? 0.012,
-      torus: spec.torus ?? 'glass',
+      torus,
       showPoints: spec.showPoints ?? true,
     })
   }
@@ -160,6 +164,7 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
           projection: scene.view,
           fibers: scene.fibers,
           gridlines: scene.gridlines,
+          cayley: scene.cayley,
           studio: studio?.spec.name,
         }),
         onStudioChange: (h) => {

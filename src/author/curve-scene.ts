@@ -9,7 +9,7 @@
  *
  *   resolve  (curve, lobes)             solveProfileCurve, reset embedding
  *   build    (k, embedding)             buildTorusScene → surface/points/plaque
- *   tubes    (fibers, gridlines)        fiber/edge/orbit TubeSet curves
+ *   tubes    (fibers, gridlines, cayley) fiber/edge/orbit/Cayley TubeSet curves
  *   style    (colorMode, boost, select) colors + sizes → points & plaque
  *   project  (α, β, γ, pole)            S3Projection → group
  *
@@ -30,6 +30,7 @@ import {
   PointCloud,
   S3Group,
   TubeSet,
+  colorByCoset,
   colorByDegree,
   colorByOrbit,
   colorByOrder,
@@ -41,10 +42,11 @@ import {
 
 import { type LabeledCurve, CURVES, resolveCurve } from './catalog'
 import { profileCandidate } from './figures'
-import { edgeCurves, fiberCurves, orbitCurve } from './grid-curves'
+import { cayleyCurves, cayleyFlatSegments, edgeCurves, fiberCurves, orbitCurve } from './grid-curves'
 import { type TorusScene, buildTorusScene, maxFeasibleK } from './torus-scene'
 
-export type ColorMode = 'degree' | 'order' | 'orbit' | 'uniform'
+/** 'coset1'/'coset2' color by coset of ⟨g₁⟩/⟨g₂⟩ — the Cayley geodesics. */
+export type ColorMode = 'degree' | 'order' | 'orbit' | 'coset1' | 'coset2' | 'uniform'
 export interface ViewAngles {
   alpha: number
   beta: number
@@ -58,6 +60,16 @@ const STAGES: Stage[] = ['resolve', 'build', 'tubes', 'style', 'project']
 /** Gray level for de-emphasized points during orbit highlight. */
 const DIM = 0.82
 
+/** Cayley-edge colors, one per generator: g₁ green, g₂ purple. */
+const CAYLEY_COLORS = [0x43a33b, 0x7d46bd] as const
+
+/** Which generators to draw Cayley edges for: true = all, false = none. */
+export type CayleySelection = boolean | number[]
+
+function cayleyIndices(sel: CayleySelection): number[] {
+  return sel === true ? [0, 1] : sel === false ? [] : sel
+}
+
 export interface CurveSceneOptions {
   curve?: number | string | CurveData
   /** Catalog the curve reference resolves against (and the panel lists). */
@@ -67,6 +79,8 @@ export interface CurveSceneOptions {
   embedding?: number
   fibers?: number
   gridlines?: number
+  /** Cayley-graph edges: true = both generators, or explicit indices ([0], [1]). */
+  cayley?: CayleySelection
   maxPoints?: number
   pointRadius?: number
   tubeRadius?: number
@@ -92,6 +106,7 @@ export interface CurveSceneUpdate {
   k?: number
   fibers?: number
   gridlines?: number
+  cayley?: CayleySelection
   colorMode?: ColorMode
   color?: number
   subfieldBoost?: boolean
@@ -106,6 +121,8 @@ export class CurveScene {
   readonly fiberTubes: TubeSet
   readonly edgeTubes: TubeSet
   readonly orbitTube: TubeSet
+  /** Cayley-graph edges, one TubeSet per generator (g₁ green, g₂ purple). */
+  readonly cayleyTubes: [TubeSet, TubeSet]
   /** The flat ℂ/Λ picture — NOT in `group` (not an S³ object); stage it yourself. */
   readonly plaque: DomainPlaque
 
@@ -120,6 +137,7 @@ export class CurveScene {
   private _k: number
   private _fibers: number
   private _gridlines: number
+  private _cayley: number[]
   private _colorMode: ColorMode = 'degree'
   private _color = 0xd43b3b
   private _profile: ProfileCurve | null = null
@@ -136,6 +154,7 @@ export class CurveScene {
     this._k = opts.k ?? 2
     this._fibers = opts.fibers ?? 0
     this._gridlines = opts.gridlines ?? 0
+    this._cayley = cayleyIndices(opts.cayley ?? false)
     this._colorMode = opts.colorMode ?? 'degree'
     this._color = opts.color ?? 0xd43b3b
     this._profile = opts.profile ?? null
@@ -153,8 +172,12 @@ export class CurveScene {
     this.fiberTubes = new TubeSet([], { radius: tubeRadius, material: colored(0x4287f5) })
     this.edgeTubes = new TubeSet([], { radius: tubeRadius, material: colored(0xd43b3b) })
     this.orbitTube = new TubeSet([], { radius: tubeRadius * 0.8, material: colored(0xe8ac2a) })
+    this.cayleyTubes = [
+      new TubeSet([], { radius: tubeRadius * 0.8, material: colored(CAYLEY_COLORS[0]) }),
+      new TubeSet([], { radius: tubeRadius * 0.8, material: colored(CAYLEY_COLORS[1]) }),
+    ]
     this.plaque = new DomainPlaque(this._scene.hopf.lattice, this._scene.flat, { pointRadius: 0.014 })
-    this.group.add(this.torus, this.points, this.fiberTubes, this.edgeTubes, this.orbitTube)
+    this.group.add(this.torus, this.points, this.fiberTubes, this.edgeTubes, this.orbitTube, ...this.cayleyTubes)
 
     this.stageTubes()
     this.stageStyle()
@@ -187,6 +210,10 @@ export class CurveScene {
   }
   get gridlines(): number {
     return this._gridlines
+  }
+  /** Generator indices whose Cayley edges are drawn ([] = off). */
+  get cayley(): number[] {
+    return [...this._cayley]
   }
   get colorMode(): ColorMode {
     return this._colorMode
@@ -229,6 +256,11 @@ export class CurveScene {
 
   setGridlines(n: number): void {
     this.update({ gridlines: n })
+  }
+
+  /** Cayley-graph edges: true = both generators, or explicit indices ([0], [1]). */
+  setCayley(sel: CayleySelection): void {
+    this.update({ cayley: sel })
   }
 
   setColorMode(m: ColorMode): void {
@@ -282,6 +314,10 @@ export class CurveScene {
     }
     if (u.gridlines !== undefined) {
       this._gridlines = u.gridlines
+      touch('tubes')
+    }
+    if (u.cayley !== undefined) {
+      this._cayley = cayleyIndices(u.cayley)
       touch('tubes')
     }
     if (u.colorMode !== undefined) {
@@ -380,14 +416,36 @@ export class CurveScene {
   }
 
   private stageTubes(): void {
-    const { hopf } = this._scene
+    const { hopf, E, lambda, flip } = this._scene
     this.fiberTubes.setCurves(this._fibers > 0 ? fiberCurves(hopf, this._fibers) : [])
     this.edgeTubes.setCurves(this._gridlines > 0 ? edgeCurves(hopf, this._gridlines) : [])
+    // |E| edges per generator regardless of coset structure — spend fewer
+    // samples per edge as the group grows (adjacent points are closer)
+    const samplesPerEdge = Math.max(3, Math.min(12, Math.ceil(60000 / E.size)))
+    this.cayleyTubes.forEach((tube, i) => {
+      const g = E.generators[i]
+      tube.setCurves(
+        this._cayley.includes(i) && g ? cayleyCurves(E, g, lambda, hopf, flip, samplesPerEdge) : [],
+      )
+    })
+    // the same geodesics on the flat picture: parallel chords per generator
+    this.plaque.setLines(
+      this._cayley
+        .filter((i) => E.generators[i])
+        .map((i) => ({
+          segments: cayleyFlatSegments(E, E.generators[i]!, this._scene.flat, hopf.lattice),
+          color: CAYLEY_COLORS[i]!,
+        })),
+    )
     this.orbitTube.setCurves(this.orbitCurves())
   }
 
   private stageStyle(): void {
     const { E } = this._scene
+    // coset modes: fall back to the last generator when g₂ doesn't exist
+    // (cyclic groups), and to the identity for the trivial group
+    const cosetGen = (i: number) =>
+      E.generators[i] ?? E.generators[E.generators.length - 1] ?? E.identity
     const colors =
       this._colorMode === 'uniform'
         ? uniformColors(E.size, this._color)
@@ -395,7 +453,11 @@ export class CurveScene {
           ? colorByDegree(E)
           : this._colorMode === 'order'
             ? colorByOrder(E)
-            : colorByOrbit(E)
+            : this._colorMode === 'coset1'
+              ? colorByCoset(E, cosetGen(0))
+              : this._colorMode === 'coset2'
+                ? colorByCoset(E, cosetGen(1))
+                : colorByOrbit(E)
     const sizes = this._subfieldBoost ? sizeByDegree(E, { subfieldBoost: 1.6 }) : E.points().map(() => 1)
     if (this._selected !== null) {
       const P = E.points()[this._selected]!
@@ -437,6 +499,7 @@ export class CurveScene {
     this.fiberTubes.dispose()
     this.edgeTubes.dispose()
     this.orbitTube.dispose()
+    for (const t of this.cayleyTubes) t.dispose()
     this.plaque.dispose()
   }
 }

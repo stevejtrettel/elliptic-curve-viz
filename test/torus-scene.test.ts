@@ -44,9 +44,27 @@ describe('buildTorusScene', () => {
     const E = s.E
     const P = E.points()[1]!
     const z = E.toComplex(P).conj()
-    const expected = s.lambda.mul(z)
-    expect(s.flat[1]!.re).toBeCloseTo(expected.re, 12)
-    expect(s.flat[1]!.im).toBeCloseTo(expected.im, 12)
+    // flat is the fundamental-domain representative: agree mod Λ_Hopf
+    const d = s.flat[1]!.sub(s.lambda.mul(z))
+    const [w1, w2] = s.hopf.lattice
+    const det = w1.re * w2.im - w1.im * w2.re
+    const a = (d.re * w2.im - d.im * w2.re) / det
+    const b = (w1.re * d.im - w1.im * d.re) / det
+    expect(a).toBeCloseTo(Math.round(a), 9)
+    expect(b).toBeCloseTo(Math.round(b), 9)
+  })
+
+  it('flat points land inside the fundamental parallelogram of Λ_Hopf', () => {
+    const [w1, w2] = scene.hopf.lattice
+    const det = w1.re * w2.im - w1.im * w2.re
+    for (const z of scene.flat) {
+      const a = (z.re * w2.im - z.im * w2.re) / det
+      const b = (w1.re * z.im - w1.im * z.re) / det
+      expect(a).toBeGreaterThanOrEqual(0)
+      expect(a).toBeLessThan(1)
+      expect(b).toBeGreaterThanOrEqual(0)
+      expect(b).toBeLessThan(1)
+    }
   })
 })
 

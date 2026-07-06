@@ -164,6 +164,29 @@ export class CurvePoints {
     return out
   }
 
+  /**
+   * The cosets of the cyclic subgroup ⟨g⟩ — they partition the group into
+   * size/order(g) classes, each listed in cyclic order (P, P+g, P+2g, …).
+   * These are the cycles of the Cayley graph for a generating set containing g.
+   */
+  cosets(g: TorusPoint): TorusPoint[][] {
+    const m = this.order(g)
+    const seen = new Set<string>()
+    const out: TorusPoint[][] = []
+    for (const P of this.points()) {
+      if (seen.has(`${P.x},${P.y}`)) continue
+      const coset: TorusPoint[] = []
+      let Q = P
+      for (let i = 0; i < m; i++) {
+        coset.push(Q)
+        seen.add(`${Q.x},${Q.y}`)
+        Q = this.add(Q, g)
+      }
+      out.push(coset)
+    }
+    return out
+  }
+
   /** Every point, enumerated as i·g₁ + j·g₂ (deterministic order). */
   points(): TorusPoint[] {
     const out: TorusPoint[] = []

@@ -98,6 +98,57 @@ describe('CurveScene selection', () => {
   })
 })
 
+describe('CurveScene Cayley graph', () => {
+  const tubeCount = (cs: CurveScene, i: number) =>
+    cs.cayleyTubes[i]!.geometry.getAttribute('position').count
+
+  it('setCayley fills one TubeSet per selected generator, tubes stage only (no rebuild)', () => {
+    const cs = new CurveScene()
+    const scene = cs.scene
+    expect(tubeCount(cs, 0)).toBe(0)
+    expect(tubeCount(cs, 1)).toBe(0)
+    cs.setCayley(true)
+    expect(cs.scene).toBe(scene) // tubes stage: scene identity kept
+    cs.cayleyTubes.forEach((_, i) => {
+      if (scene.E.generators[i]) expect(tubeCount(cs, i)).toBeGreaterThan(0)
+      else expect(tubeCount(cs, i)).toBe(0)
+    })
+    cs.setCayley(false)
+    expect(tubeCount(cs, 0)).toBe(0)
+    expect(tubeCount(cs, 1)).toBe(0)
+  })
+
+  it('draws the flat chords on the plaque when cayley is on, clears when off', () => {
+    const cs = new CurveScene()
+    const base = cs.plaque.children.length
+    cs.setCayley(true)
+    const drawn = cs.plaque.children.length - base
+    expect(drawn).toBe(cs.scene.E.generators.length)
+    cs.setCayley(false)
+    expect(cs.plaque.children.length).toBe(base)
+  })
+
+  it('coset color modes restyle without rebuilding the scene', () => {
+    const cs = new CurveScene()
+    const scene = cs.scene
+    cs.setColorMode('coset2')
+    expect(cs.scene).toBe(scene)
+    expect(cs.colorMode).toBe('coset2')
+    cs.setColorMode('coset1') // falls back gracefully even for cyclic groups
+    expect(cs.colorMode).toBe('coset1')
+  })
+
+  it('the selection persists across rebuilds (k change)', () => {
+    const cs = new CurveScene({ cayley: true, k: 2 })
+    cs.setK(1)
+    expect(cs.cayley).toEqual([0, 1])
+    const E = cs.scene.E
+    cs.cayleyTubes.forEach((_, i) => {
+      if (E.generators[i]) expect(tubeCount(cs, i)).toBeGreaterThan(0)
+    })
+  })
+})
+
 describe('CurveScene onChange', () => {
   it('fires exactly once per setter, none during construction', () => {
     let calls = 0

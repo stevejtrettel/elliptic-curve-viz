@@ -48,6 +48,26 @@ describe('DomainPlaque', () => {
     expect((plaque.children[1] as THREE.InstancedMesh).count).toBe(2)
   })
 
+  it('setLines builds one ribbon mesh per set, in plaque-local coordinates', () => {
+    const plaque = new DomainPlaque(LATTICE, [])
+    const base = plaque.children.length
+    plaque.setLines([
+      { segments: [[new Complex(0, 0), new Complex(Math.PI, 0)]], color: 0x43a33b },
+      { segments: [[new Complex(0, 0), new Complex(0, 2)]], color: 0x7d46bd, width: 0.02 },
+    ])
+    expect(plaque.children.length).toBe(base + 2)
+    const ribbon = plaque.children[base] as THREE.Mesh
+    const pos = ribbon.geometry.getAttribute('position') as THREE.BufferAttribute
+    expect(pos.count).toBe(4) // one quad per segment
+    // quad spans the segment: x runs 0 → π·scaleNorm, y = ±width/2
+    const s = 1 / (2 * Math.PI)
+    expect(Math.max(pos.getX(2), pos.getX(3))).toBeCloseTo(Math.PI * s, 6)
+    expect(Math.abs(pos.getY(0))).toBeCloseTo(0.004, 6)
+    // clearing removes the meshes and their resources
+    plaque.setLines([])
+    expect(plaque.children.length).toBe(base)
+  })
+
   it('setLattice rescales the plaque', () => {
     const plaque = new DomainPlaque(LATTICE, [])
     plaque.setLattice([new Complex(1, 0), new Complex(0, 0.5)])

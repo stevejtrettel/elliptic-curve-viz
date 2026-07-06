@@ -11,7 +11,7 @@ import * as THREE from 'three'
 import { Complex } from '@/math/core'
 
 import { TraceBaker } from './bake-instanced'
-import { matte } from './materials'
+import { colored, matte } from './materials'
 
 export interface DomainPlaqueOptions {
   pointRadius?: number
@@ -19,6 +19,17 @@ export interface DomainPlaqueOptions {
   sizes?: number[]
   material?: THREE.Material
 }
+
+/** One family of line segments drawn on the plaque (e.g. Cayley chords). */
+export interface PlaqueLineSet {
+  segments: [Complex, Complex][]
+  color: number
+  /** Ribbon width in the plaque's normalized units (default 0.008). */
+  width?: number
+}
+
+/** Ribbons float just above the plaque face, below the point spheres. */
+const LINE_Z = 0.002
 
 export class DomainPlaque extends THREE.Group {
   private lattice: [Complex, Complex]
@@ -28,6 +39,8 @@ export class DomainPlaque extends THREE.Group {
   private scaleNorm = 1
   private plaque: THREE.Mesh
   private spheres: THREE.InstancedMesh
+  private lineSets: PlaqueLineSet[] = []
+  private lineMeshes: THREE.Mesh[] = []
   private readonly dummy = new THREE.Object3D()
   private readonly baker = new TraceBaker(this, () => this.spheres)
 
@@ -57,6 +70,13 @@ export class DomainPlaque extends THREE.Group {
     this.lattice = lattice
     this.rebuildPlaque()
     this.placePoints()
+    this.rebuildLines() // scaleNorm may have changed
+  }
+
+  /** Replace the line families drawn on the plaque ([] clears them). */
+  setLines(sets: PlaqueLineSet[]): void {
+    this.lineSets = sets
+    this.rebuildLines()
   }
 
   setPoints(points: Complex[], colors?: Float32Array, sizes?: number[] | null): void {
@@ -108,6 +128,41 @@ export class DomainPlaque extends THREE.Group {
     this.plaque.geometry = geometry
   }
 
+  private rebuildLines(): void {
+    for (const mesh of this.lineMeshes) {
+      this.remove(mesh)
+      mesh.geometry.dispose()
+      ;(mesh.material as THREE.Material).dispose()
+    }
+    this.lineMeshes = []
+    for (const set of this.lineSets) {
+      if (set.segments.length === 0) continue
+      const half = (set.width ?? 0.008) / 2
+      const positions = new Float32Array(12 * set.segments.length)
+      const index: number[] = []
+      set.segments.forEach(([p, q], s) => {
+        const [px, py] = this.toLocal(p)
+        const [qx, qy] = this.toLocal(q)
+        const len = Math.hypot(qx - px, qy - py) || 1
+        // in-plane normal, half a ribbon width long
+        const nx = (-(qy - py) / len) * half
+        const ny = ((qx - px) / len) * half
+        positions.set(
+          [px + nx, py + ny, LINE_Z, px - nx, py - ny, LINE_Z, qx + nx, qy + ny, LINE_Z, qx - nx, qy - ny, LINE_Z],
+          12 * s,
+        )
+        index.push(4 * s, 4 * s + 1, 4 * s + 2, 4 * s + 1, 4 * s + 3, 4 * s + 2)
+      })
+      const geometry = new THREE.BufferGeometry()
+      geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      geometry.setIndex(index)
+      geometry.computeVertexNormals()
+      const mesh = new THREE.Mesh(geometry, colored(set.color))
+      this.lineMeshes.push(mesh)
+      this.add(mesh)
+    }
+  }
+
   private placePoints(): void {
     for (let i = 0; i < this.points.length; i++) {
       const [x, y] = this.toLocal(this.points[i]!)
@@ -129,6 +184,8 @@ export class DomainPlaque extends THREE.Group {
   /** Release every GPU resource this renderable created. */
   dispose(): void {
     this.baker.dispose()
+    this.lineSets = []
+    this.rebuildLines()
     this.remove(this.plaque, this.spheres)
     this.plaque.geometry.dispose()
     ;(this.plaque.material as THREE.Material).dispose()

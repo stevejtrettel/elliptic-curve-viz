@@ -10,6 +10,7 @@ import {
   PALETTES,
   PointCloud,
   S3Group,
+  colorByCoset,
   colorByDegree,
   colorByOrbit,
   colorByOrder,
@@ -198,6 +199,23 @@ describe('style helpers', () => {
       else byDegree.set(d, key)
     })
     expect(new Set(byDegree.values()).size).toBe(byDegree.size) // distinct colors per degree
+  })
+
+  it('colorByCoset is constant on each ⟨g⟩-coset', () => {
+    const g = E.generators[E.generators.length - 1]!
+    const colors = colorByCoset(E, g)
+    expect(colors.length).toBe(3 * E.size)
+    const pts = E.points()
+    const index = new Map(pts.map((P, i) => [`${P.x},${P.y}`, i]))
+    for (const coset of E.cosets(g).slice(0, 40)) {
+      const keys = new Set(
+        coset.map((P) => {
+          const i = index.get(`${P.x},${P.y}`)!
+          return `${colors[3 * i]},${colors[3 * i + 1]},${colors[3 * i + 2]}`
+        }),
+      )
+      expect(keys.size).toBe(1)
+    }
   })
 
   it('sizeByDegree boosts exactly the subfield points, graded by tower depth', () => {

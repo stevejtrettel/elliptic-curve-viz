@@ -19,6 +19,22 @@ describe('decodeParams', () => {
     expect(decodeParams('?domain=0&trace=yes')).toEqual({})
   })
 
+  it('parses cayley generator selections', () => {
+    expect(decodeParams('?cayley=1')).toEqual({ cayley: [0, 1] })
+    expect(decodeParams('?cayley=both')).toEqual({ cayley: [0, 1] })
+    expect(decodeParams('?cayley=g1')).toEqual({ cayley: [0] })
+    expect(decodeParams('?cayley=g2')).toEqual({ cayley: [1] })
+    expect(decodeParams('?cayley=banana')).toEqual({})
+  })
+
+  it('parses torus visibility/material', () => {
+    expect(decodeParams('?torus=0')).toEqual({ torus: false })
+    expect(decodeParams('?torus=off')).toEqual({ torus: false })
+    expect(decodeParams('?torus=matte')).toEqual({ torus: 'matte' })
+    expect(decodeParams('?torus=glass')).toEqual({ torus: 'glass' })
+    expect(decodeParams('?torus=banana')).toEqual({})
+  })
+
   it('passes studio through as a string', () => {
     expect(decodeParams('?studio=paper-white')).toEqual({ studio: 'paper-white' })
   })

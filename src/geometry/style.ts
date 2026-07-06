@@ -47,6 +47,18 @@ export function colorByOrder(E: CurvePoints, palette = DEFAULT): Float32Array {
   return colors
 }
 
+/** Color by coset of ⟨g⟩: points on the same Cayley geodesic share a color. */
+export function colorByCoset(E: CurvePoints, g: TorusPoint, palette = DEFAULT): Float32Array {
+  const pts = E.points()
+  const colors = new Float32Array(3 * pts.length)
+  const slot = new Map<string, number>()
+  E.cosets(g).forEach((coset, c) => {
+    for (const P of coset) slot.set(pointKey(P), c)
+  })
+  pts.forEach((P, i) => fill(colors, i, palette[slot.get(pointKey(P))! % palette.length]!))
+  return colors
+}
+
 /** Color by Frobenius orbit (palette cycles across orbits, one color per orbit). */
 export function colorByOrbit(E: CurvePoints, palette = DEFAULT): Float32Array {
   const pts = E.points()

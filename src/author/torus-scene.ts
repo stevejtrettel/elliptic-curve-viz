@@ -16,10 +16,27 @@ export interface TorusScene {
   E: CurvePoints
   /** S³ positions parallel to E.points(). */
   positions: Vec4[]
-  /** The flat picture: λ·z ∈ ℂ/Λ_Hopf, parallel to E.points(). */
+  /**
+   * The flat picture: λ·z ∈ ℂ/Λ_Hopf, parallel to E.points(), as the
+   * CANONICAL representative in the fundamental parallelogram
+   * {a·ω₁ + b·ω₂ : a, b ∈ [0, 1)} — what DomainPlaque draws.
+   */
   flat: Complex[]
   lambda: Complex
   flip: boolean
+}
+
+/** Reduce z into the fundamental parallelogram of the lattice. */
+function toFundamental(z: Complex, [w1, w2]: [Complex, Complex]): Complex {
+  const det = w1.re * w2.im - w1.im * w2.re
+  // wall-straddling roundoff: snap 1 − ε back to 0 (same point of the torus)
+  const frac = (x: number) => {
+    const f = x - Math.floor(x)
+    return f > 1 - 1e-9 ? 0 : f
+  }
+  const a = (z.re * w2.im - z.im * w2.re) / det
+  const b = (w1.re * z.im - w1.im * z.re) / det
+  return w1.scale(frac(a)).add(w2.scale(frac(b)))
 }
 
 export interface TorusSceneOptions {
@@ -59,7 +76,9 @@ export function buildTorusScene(
   const flat = E.points().map((P) => {
     let z = E.toComplex(P)
     if (flip) z = z.conj()
-    return lambda.mul(z)
+    // λ·(ℤ ⊕ τℤ) = Λ_Hopf, but (λ, λτ) is a DIFFERENT basis of it than
+    // (ω₁, ω₂) — reduce so the flat points land on the drawn parallelogram
+    return toFundamental(lambda.mul(z), hopf.lattice)
   })
   const positions = flat.map((z) => hopf.rollUp(z, { exact: true }))
   return { hopf, E, positions, flat, lambda, flip }

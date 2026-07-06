@@ -9,7 +9,7 @@ import { glass, matte } from '@/geometry'
 
 import type { ControlPanel } from '@/studio'
 
-import type { CurveScene } from './curve-scene'
+import type { ColorMode, CurveScene } from './curve-scene'
 
 export interface StandardPanelOptions {
   /** Refit camera (and parked plaque) to the stage — after curve/embedding swaps. */
@@ -89,11 +89,13 @@ export function addCurveTabs(panel: ControlPanel, scene: CurveScene, opts: Stand
         { label: 'field of definition', value: 'degree' },
         { label: 'group order', value: 'order' },
         { label: 'Frobenius orbit', value: 'orbit' },
+        { label: 'coset of ⟨g₁⟩', value: 'coset1' },
+        { label: 'coset of ⟨g₂⟩', value: 'coset2' },
         { label: 'single color', value: 'uniform' },
       ],
       value: scene.colorMode,
     },
-    (v) => scene.setColorMode(v as 'degree' | 'order' | 'orbit' | 'uniform'),
+    (v) => scene.setColorMode(v as ColorMode),
   )
 
   pointsTab.slider('Radius', { min: 0.005, max: 0.12, step: 0.005, value: opts.pointRadius ?? 0.035 }, (v) => {
@@ -127,10 +129,29 @@ export function addCurveTabs(panel: ControlPanel, scene: CurveScene, opts: Stand
   viewTab.slider('Fibers', { min: 0, max: 24, step: 1, value: scene.fibers }, (v) => scene.setFibers(v))
   viewTab.slider('Gridlines', { min: 0, max: 24, step: 1, value: scene.gridlines }, (v) => scene.setGridlines(v))
 
+  const cayleyValue = () => {
+    const sel = scene.cayley
+    return sel.length === 0 ? 'off' : sel.length === 2 ? 'both' : sel[0] === 0 ? 'g1' : 'g2'
+  }
+  viewTab.dropdown(
+    'Cayley graph',
+    {
+      options: [
+        { label: 'off', value: 'off' },
+        { label: 'generator g₁', value: 'g1' },
+        { label: 'generator g₂', value: 'g2' },
+        { label: 'both generators', value: 'both' },
+      ],
+      value: cayleyValue(),
+    },
+    (v) => scene.setCayley(v === 'off' ? [] : v === 'g1' ? [0] : v === 'g2' ? [1] : true),
+  )
+
   viewTab.slider('Tube radius', { min: 0.004, max: 0.05, step: 0.002, value: opts.tubeRadius ?? 0.012 }, (v) => {
     scene.fiberTubes.setRadius(v)
     scene.edgeTubes.setRadius(v)
     scene.orbitTube.setRadius(v * 0.8)
+    for (const t of scene.cayleyTubes) t.setRadius(v * 0.8)
     opts.invalidate()
   })
 

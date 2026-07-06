@@ -594,6 +594,7 @@ Each phase ends with something visible and testable; plans reviewed before codin
 | 2026-07-04 | `demos/_shared` promoted into `src/author`; recompute = linear ladder resolve < build < tubes < style < project; URL params read-at-boot only (no write-back); zero new dependencies |
 | 2026-07-04 | `data/curves.json` descriptor list = the ecfplat handoff contract and the demo catalog (single source, parsed+validated at import); j↔(a,b,c) bijection stays Python-side |
 | 2026-07-04 | Studio design workflow: picker in Studio tab (registry swap), opt-in Design tab edits spec data live via setStudio recompile, "Copy spec" serializes a preset module; second built-in studio velvet-dark |
+| 2026-07-06 | Cayley graphs of E(F_{p^k}) for the SNF generators: `cosets(g)` on CurvePoints (math); edges rendered per generator as the \|E\|/order(g) ⟨g⟩-coset cycles, each a CLOSED GEODESIC of ℂ/Λ (adding g = translation by the constant λ·g) — `cayleyCurves` in author, one TubeSet per generator (g₁ green, g₂ purple), `cayley` in CurveScene/showCurve/`?cayley=g1\|g2\|both` |
 
 ## 13. Open questions
 

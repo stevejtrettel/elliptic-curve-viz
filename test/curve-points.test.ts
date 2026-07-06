@@ -178,6 +178,26 @@ describe('E(F_{p^k}) invariants', () => {
     }
   })
 
+  it.each(fixtures)('%s: cosets of ⟨g⟩ partition the group into cycles of order(g)', (_name, fx) => {
+    const data = curveData(fx)
+    const E = pointsOver(data, 3)
+    for (const g of [...E.generators, E.mul(2, E.generators[0]!), E.identity]) {
+      const m = E.order(g)
+      const cosets = E.cosets(g)
+      expect(cosets.length).toBe(E.size / m)
+      // partition: every point exactly once
+      const all = pointSet(cosets.flat())
+      expect(all.size).toBe(E.size)
+      // cyclic order: consecutive entries differ by g, and the cycle closes
+      for (const coset of cosets.slice(0, 50)) {
+        expect(coset.length).toBe(m)
+        for (let i = 0; i < m; i++) {
+          expect(E.add(coset[i]!, g)).toEqual(coset[(i + 1) % m]!)
+        }
+      }
+    }
+  })
+
   it.each(fixtures)('%s: field-of-definition filtration matches pointsOver at each level', (_name, fx) => {
     const data = curveData(fx)
     const sizes = sizesByRecurrence(data.trace, data.p, 6)

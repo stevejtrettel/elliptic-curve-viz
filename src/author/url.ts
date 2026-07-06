@@ -14,6 +14,10 @@ export interface UrlState {
   n?: number
   fibers?: number
   grid?: number
+  /** Cayley-graph generator indices: ?cayley=g1|g2|both (or 1 ≡ both). */
+  cayley?: number[]
+  /** Torus surface: ?torus=0|off hides it, matte|glass pick the material. */
+  torus?: 'glass' | 'matte' | false
   domain?: boolean
   trace?: boolean
   blocktrace?: number
@@ -48,6 +52,13 @@ export function decodeParams(search: string): UrlState {
   num('beta', (v) => (state.beta = v))
   num('gamma', (v) => (state.gamma = v))
   num('pole', (v) => (state.pole = v))
+  const cayley = p.get('cayley')
+  if (cayley === '1' || cayley === 'both') state.cayley = [0, 1]
+  else if (cayley === 'g1') state.cayley = [0]
+  else if (cayley === 'g2') state.cayley = [1]
+  const torus = p.get('torus')
+  if (torus === '0' || torus === 'off') state.torus = false
+  else if (torus === 'matte' || torus === 'glass') state.torus = torus
   if (p.get('domain') === '1') state.domain = true
   if (p.get('trace') === '1') state.trace = true
   if (p.get('design') === '1') state.design = true
