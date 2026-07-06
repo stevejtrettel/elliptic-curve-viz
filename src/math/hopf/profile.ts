@@ -3,12 +3,24 @@
  * canonically as uniform samples — formulas are just one way to make them,
  * keeping the door open for evolved/flowed curves (DiscreteCurve).
  */
+import { Vec3 } from '@/math/core'
+
 import { PeriodicInterpolant } from './interpolant'
 
 /** Spherical coordinates: φ ∈ (0, π) from the north pole, θ the longitude. */
 export interface SpherePoint {
   theta: number
   phi: number
+}
+
+/**
+ * The point of S² ⊂ ℝ³ at (θ, φ): (sin φ cos θ, sin φ sin θ, cos φ).
+ * THE identification of the Hopf base with the unit sphere: η(H₍θ,φ₎(s)) =
+ * e^{iθ}·tan(φ/2), i.e. stereographic projection from the south pole.
+ */
+export function sphereToR3(p: SpherePoint): Vec3 {
+  const sinPhi = Math.sin(p.phi)
+  return new Vec3(sinPhi * Math.cos(p.theta), sinPhi * Math.sin(p.theta), Math.cos(p.phi))
 }
 
 /**

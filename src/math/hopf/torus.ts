@@ -17,7 +17,7 @@
 import { Complex, Vec4, cross4 } from '@/math/core'
 
 import { PeriodicInterpolant, invertMonotoneTable, lerpTable } from './interpolant'
-import type { ProfileCurve } from './profile'
+import type { ProfileCurve, SpherePoint } from './profile'
 
 export interface HopfTorusOptions {
   /** Profile-curve samples promoted to the trig interpolant (accuracy knob). */
@@ -128,14 +128,7 @@ export class HopfTorus {
     s -= Math.floor(s / TWO_PI) * TWO_PI
 
     // Step 2 — v with L(v) = 2t.
-    let v = invertMonotoneTable(this.arcTable, 2 * t, TWO_PI)
-    if (opts.exact) {
-      for (let iter = 0; iter < 4; iter++) {
-        const err = this.arcIntegrand.antiderivative(v) - 2 * t
-        if (Math.abs(err) < 1e-15 * this.length) break
-        v -= err / this.arcIntegrand.value(v)
-      }
-    }
+    const v = this.invertArc(t, opts.exact ?? false)
 
     // Step 3 — θ, φ, f.
     const { theta, phi } = this.profileAt(v)
@@ -143,6 +136,30 @@ export class HopfTorus {
 
     // Step 4 — H₍θ,φ₎(s − f).
     return hopfFiberPoint(theta, phi, s - f)
+  }
+
+  /**
+   * η ∘ rollUp: the image on the base S² — Steps 1–2 only. The Hopf map
+   * collapses each fiber, so the base point depends only on Im z: every
+   * point of the torus sits over the profile curve, at arc-length 2·Im z.
+   */
+  baseAt(z: Complex, opts: RollUpOptions = {}): SpherePoint {
+    const halfL = this.length / 2
+    const t = z.im - Math.floor(z.im / halfL) * halfL
+    return this.profileAt(this.invertArc(t, opts.exact ?? false))
+  }
+
+  /** Step 2: v with L(v) = 2t — table seed, optional Newton to machine precision. */
+  private invertArc(t: number, exact: boolean): number {
+    let v = invertMonotoneTable(this.arcTable, 2 * t, TWO_PI)
+    if (exact) {
+      for (let iter = 0; iter < 4; iter++) {
+        const err = this.arcIntegrand.antiderivative(v) - 2 * t
+        if (Math.abs(err) < 1e-15 * this.length) break
+        v -= err / this.arcIntegrand.value(v)
+      }
+    }
+    return v
   }
 
   /**

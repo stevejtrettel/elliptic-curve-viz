@@ -19,6 +19,8 @@ export interface UrlState {
   /** Torus surface: ?torus=0|off hides it, matte|glass pick the material. */
   torus?: 'glass' | 'matte' | false
   domain?: boolean
+  /** Show the S² base picture beside the torus (?sphere=1). */
+  sphere?: boolean
   trace?: boolean
   blocktrace?: number
   studio?: string
@@ -60,6 +62,7 @@ export function decodeParams(search: string): UrlState {
   if (torus === '0' || torus === 'off') state.torus = false
   else if (torus === 'matte' || torus === 'glass') state.torus = torus
   if (p.get('domain') === '1') state.domain = true
+  if (p.get('sphere') === '1') state.sphere = true
   if (p.get('trace') === '1') state.trace = true
   if (p.get('design') === '1') state.design = true
   const studio = p.get('studio')

@@ -19,6 +19,9 @@ export interface StandardPanelOptions {
   /** Stage/unstage the flat-domain plaque; omit to drop the toggle. */
   setDomain?: (show: boolean) => void
   domainShown?: boolean
+  /** Stage/unstage the S² base picture; omit to drop the toggle. */
+  setSphere?: (show: boolean) => void
+  sphereShown?: boolean
   /** Initial values for the cheap renderable knobs (the spec's scene layout). */
   pointRadius?: number
   tubeRadius?: number
@@ -114,6 +117,14 @@ export function addCurveTabs(panel: ControlPanel, scene: CurveScene, opts: Stand
     const setDomain = opts.setDomain
     pointsTab.toggle('Show flat domain', opts.domainShown ?? false, (v) => {
       setDomain(v)
+      opts.invalidate()
+    })
+  }
+
+  if (opts.setSphere) {
+    const setSphere = opts.setSphere
+    pointsTab.toggle('Show base S²', opts.sphereShown ?? false, (v) => {
+      setSphere(v)
       opts.invalidate()
     })
   }

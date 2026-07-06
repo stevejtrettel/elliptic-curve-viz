@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import { Complex, Vec4 } from '@/math/core'
-import { DiscreteCurve, HopfTorus, LatitudeCircle, WavyCircle } from '@/math/hopf'
+import { DiscreteCurve, HopfTorus, LatitudeCircle, WavyCircle, sphereToR3 } from '@/math/hopf'
 
 const TWO_PI = 2 * Math.PI
 
@@ -80,6 +80,33 @@ describe('HopfTorus.rollUp', () => {
       expect(dds.norm(), `|∂/∂s| at ${z.re},${z.im}`).toBeCloseTo(1, 6)
       expect(ddt.norm(), `|∂/∂t| at ${z.re},${z.im}`).toBeCloseTo(1, 6)
       expect(Math.abs(dds.dot(ddt)), `⟨∂s,∂t⟩ at ${z.re},${z.im}`).toBeLessThan(1e-6)
+    }
+  })
+})
+
+describe('HopfTorus.baseAt — the η-convention lock', () => {
+  it.each(TORI)('%s: η(rollUp(z)) = sphereToR3(baseAt(z)) for every test point', (_name, torus) => {
+    for (const z of testPoints(torus)) {
+      // η(z, w) = z/w ∈ ℂ ∪ ∞, pulled back to S² by inverse stereographic
+      // projection from the south pole: |ζ| = tan(φ/2), arg ζ = θ
+      const h = torus.rollUp(z, { exact: true })
+      const [num, den] = [new Complex(h.x, h.y), new Complex(h.z, h.w)]
+      const zeta = num.mul(den.conj()).scale(1 / (den.re * den.re + den.im * den.im))
+      const viaEta = sphereToR3({ theta: Math.atan2(zeta.im, zeta.re), phi: 2 * Math.atan(zeta.abs()) })
+      const viaBase = sphereToR3(torus.baseAt(z, { exact: true }))
+      expect(viaBase.x).toBeCloseTo(viaEta.x, 10)
+      expect(viaBase.y).toBeCloseTo(viaEta.y, 10)
+      expect(viaBase.z).toBeCloseTo(viaEta.z, 10)
+    }
+  })
+
+  it.each(TORI)('%s: the base image depends only on Im z (η collapses fibers)', (_name, torus) => {
+    for (const z of testPoints(torus)) {
+      const a = torus.baseAt(z, { exact: true })
+      const b = torus.baseAt(new Complex(z.re + 1.234, z.im), { exact: true })
+      expect(a.phi).toBeCloseTo(b.phi, 12)
+      expect(Math.cos(a.theta)).toBeCloseTo(Math.cos(b.theta), 12)
+      expect(Math.sin(a.theta)).toBeCloseTo(Math.sin(b.theta), 12)
     }
   })
 })

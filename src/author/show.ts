@@ -71,6 +71,8 @@ export interface CurveDemoSpec {
   showPoints?: boolean
   /** Show the flat fundamental domain beside the torus. */
   domain?: boolean
+  /** Show the S² base picture (profile curve + fiber marks) beside the torus. */
+  sphere?: boolean
   maxPoints?: number
   /** Studio preset; false = bare renderer, no Studio tab. ?studio=<name> overrides from the registry. */
   studio?: StudioSpec | false
@@ -137,13 +139,23 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
   }
   if (domainShown) app.stage.add(scene.plaque)
 
+  let sphereShown = url.sphere ?? spec.sphere ?? false
+  const setSphere = (show: boolean) => {
+    sphereShown = show
+    if (show) app.stage.add(scene.sphere)
+    else app.stage.remove(scene.sphere)
+  }
+  if (sphereShown) app.stage.add(scene.sphere)
+
   const frame = () => {
-    // park the flat domain beside the torus (scaled to match) BEFORE framing,
-    // so the camera fit accounts for it when visible
+    // park the side pictures beside the torus (scaled to match) BEFORE
+    // framing, so the camera fit accounts for them when visible
     scene.torus.geometry.computeBoundingSphere()
     const r = scene.torus.geometry.boundingSphere?.radius ?? 3
     scene.plaque.position.set(-1.55 * r, 0.45 * r, 0)
     scene.plaque.scale.setScalar(0.8 * r)
+    scene.sphere.position.set(1.55 * r, 0.45 * r, 0)
+    scene.sphere.scale.setScalar(0.45 * r)
     app.frame(spec.camera ?? {})
   }
 
@@ -154,6 +166,8 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
       invalidate: () => app.invalidate(),
       setDomain,
       domainShown,
+      setSphere,
+      sphereShown,
       pointRadius: spec.pointRadius ?? 0.035,
       tubeRadius: spec.tubeRadius ?? 0.012,
       torus,

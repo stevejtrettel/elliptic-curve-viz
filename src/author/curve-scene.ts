@@ -22,9 +22,10 @@ import { tauOf } from '@/math/arithmetic'
 import { Quaternion, Vec4 } from '@/math/core'
 import type { Candidate } from '@/math/families'
 import { solveProfileCurve } from '@/math/families'
-import { type ProfileCurve, S3Projection } from '@/math/hopf'
+import { type ProfileCurve, S3Projection, sphereToR3 } from '@/math/hopf'
 
 import {
+  BaseSphere,
   DomainPlaque,
   HopfTorusMesh,
   PointCloud,
@@ -137,6 +138,8 @@ export class CurveScene {
   readonly cayleyTubes: [TubeSet, TubeSet]
   /** The flat ℂ/Λ picture — NOT in `group` (not an S³ object); stage it yourself. */
   readonly plaque: DomainPlaque
+  /** The Hopf base S² with the profile curve — NOT in `group`; stage it yourself. */
+  readonly sphere: BaseSphere
 
   readonly catalog: LabeledCurve[]
   private readonly maxPoints: number
@@ -193,6 +196,8 @@ export class CurveScene {
       new TubeSet([], { radius: tubeRadius * 0.8, material: colored(CAYLEY_COLORS[1]) }),
     ]
     this.plaque = new DomainPlaque(this._scene.hopf.lattice, this._scene.flat, { pointRadius: 0.014 })
+    this.sphere = new BaseSphere()
+    this.sphere.setCurve(this.profileSamples())
     this.group.add(this.torus, this.points, this.fiberTubes, this.edgeTubes, this.orbitTube, ...this.cayleyTubes)
 
     this.stageTubes()
@@ -445,12 +450,26 @@ export class CurveScene {
     this.points.setPoints(this._scene.positions)
     this.plaque.setLattice(this._scene.hopf.lattice)
     this.plaque.setPoints(this._scene.flat)
+    this.sphere.setCurve(this.profileSamples())
+  }
+
+  /** The profile curve as drawn on the base S² (uniform samples). */
+  private profileSamples() {
+    const { hopf } = this._scene
+    return Array.from({ length: 256 }, (_, j) => hopf.profileAt((2 * Math.PI * j) / 256))
   }
 
   private stageTubes(): void {
     const { hopf, E, lambda, flip, unit } = this._scene
     this.fiberTubes.setCurves(this._fibers > 0 ? fiberCurves(hopf, this._fibers) : [])
     this.edgeTubes.setCurves(this._gridlines > 0 ? edgeCurves(hopf, this._gridlines) : [])
+    // each fiber tube's base point, marked on the S² picture (same x = f/count)
+    this.sphere.setMarks(
+      Array.from({ length: this._fibers }, (_, f) =>
+        sphereToR3(hopf.profileAt((2 * Math.PI * f) / this._fibers)),
+      ),
+      uniformColors(this._fibers, 0x4287f5),
+    )
     this._displayGens = this._cayleyBasis === 'structure' ? E.generators : reducedGenerators(E, unit)
     // |E| edges per generator regardless of coset structure — spend fewer
     // samples per edge as the group grows (adjacent points are closer)
@@ -534,5 +553,6 @@ export class CurveScene {
     this.orbitTube.dispose()
     for (const t of this.cayleyTubes) t.dispose()
     this.plaque.dispose()
+    this.sphere.dispose()
   }
 }
