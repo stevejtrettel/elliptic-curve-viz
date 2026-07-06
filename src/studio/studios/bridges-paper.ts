@@ -38,4 +38,6 @@ export const bridgesPaper: StudioSpec = {
   backdrop: { kind: 'floor', color: 0xffffff, clearcoat: 1, y: 'auto', size: 'auto' },
   camera: { fov: 50, azimuth: 2.36, elevation: 1.556, fill: 0.72 },
   look: { toneMapping: 'aces', exposure: 1 },
+  // the paper's figures traced at 30 bounces (glass tori need the depth)
+  trace: { bounces: 30 },
 }

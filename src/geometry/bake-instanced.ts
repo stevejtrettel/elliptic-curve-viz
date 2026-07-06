@@ -78,6 +78,60 @@ export function bakeInstancedMesh(mesh: THREE.InstancedMesh): THREE.Mesh {
   return new THREE.Mesh(geometry, material)
 }
 
+/**
+ * Owns the trace-mode dual representation for one instanced renderable: the
+ * lazily-baked merged mesh, its dirty flag, and the live/trace visibility
+ * toggle. The live mesh is fetched through a callback because renderables
+ * reallocate it when instance counts change.
+ */
+export class TraceBaker {
+  private traceMesh: THREE.Mesh | null = null
+  private dirty = true
+  private _mode: 'live' | 'trace' = 'live'
+
+  constructor(
+    /** Parent the baked mesh is added to/removed from. */
+    private readonly owner: THREE.Object3D,
+    /** The CURRENT live InstancedMesh (may be reallocated by the owner). */
+    private readonly source: () => THREE.InstancedMesh,
+  ) {}
+
+  get mode(): 'live' | 'trace' {
+    return this._mode
+  }
+
+  setMode(mode: 'live' | 'trace'): void {
+    this._mode = mode
+    if (mode === 'trace') this.ensure()
+    this.source().visible = mode === 'live'
+    if (this.traceMesh) this.traceMesh.visible = mode === 'trace'
+  }
+
+  /** The instances changed; rebake now if trace mode is showing, else lazily. */
+  invalidate(): void {
+    this.dirty = true
+    if (this._mode === 'trace') this.ensure()
+  }
+
+  dispose(): void {
+    if (!this.traceMesh) return
+    this.owner.remove(this.traceMesh)
+    this.traceMesh.geometry.dispose()
+    ;(this.traceMesh.material as THREE.Material).dispose()
+    this.traceMesh = null
+    this.dirty = true
+  }
+
+  private ensure(): void {
+    if (!this.dirty && this.traceMesh) return
+    this.dispose()
+    this.traceMesh = bakeInstancedMesh(this.source())
+    this.traceMesh.visible = this._mode === 'trace'
+    this.owner.add(this.traceMesh)
+    this.dirty = false
+  }
+}
+
 /** Renderables with a live/trace dual representation. */
 export interface TraceBakeable {
   setMode(mode: 'live' | 'trace'): void

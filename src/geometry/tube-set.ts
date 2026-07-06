@@ -12,13 +12,12 @@
  */
 import * as THREE from 'three'
 
-import { Vec3, Vec4 } from '@/math/core'
+import { Vec3, Vec4, packVec4s } from '@/math/core'
 import { S3Projection } from '@/math/hopf'
 
+import { applyIndexFilter, isProjectable } from './holes'
 import { colored } from './materials'
 import type { S3Renderable } from './s3group'
-
-const HOLE_LIMIT = 1e6
 
 export interface TubeCurve {
   points: Vec4[]
@@ -67,16 +66,7 @@ export class TubeSet extends THREE.Mesh implements S3Renderable {
 
   /** EXPENSIVE — new centerlines (reallocates the merged buffers). */
   setCurves(curves: TubeCurve[]): void {
-    this.centerlines = curves.map((c) => {
-      const arr = new Float64Array(4 * c.points.length)
-      c.points.forEach((p, i) => {
-        arr[4 * i] = p.x
-        arr[4 * i + 1] = p.y
-        arr[4 * i + 2] = p.z
-        arr[4 * i + 3] = p.w
-      })
-      return arr
-    })
+    this.centerlines = curves.map((c) => packVec4s(c.points))
     this.layouts = curves.map((c) => ({
       closed: c.closed,
       samples: c.points.length,
@@ -108,15 +98,22 @@ export class TubeSet extends THREE.Mesh implements S3Renderable {
     if (this.lastProjection) this.reproject(this.lastProjection)
   }
 
-  /** Recomputes rings from the cached projection (O(vertices), no math-layer calls). */
+  /** Recomputes rings from the cached projection — O(vertices), a few flops per sample. */
   setRadius(radius: number): void {
     this.radiusS3 = radius
     if (this.lastProjection) this.reproject(this.lastProjection)
   }
 
-  /** CHEAP. */
+  /** CHEAP. Takes ownership: the replaced material is disposed. */
   setMaterial(material: THREE.Material): void {
+    if (material !== this.material) (this.material as THREE.Material).dispose()
     this.material = material
+  }
+
+  /** Release the geometry and current material. */
+  dispose(): void {
+    this.geometry.dispose()
+    ;(this.material as THREE.Material).dispose()
   }
 
   reproject(proj: S3Projection): void {
@@ -124,7 +121,9 @@ export class TubeSet extends THREE.Mesh implements S3Renderable {
     const pos = this.geometry.getAttribute('position') as THREE.BufferAttribute
     const nor = this.geometry.getAttribute('normal') as THREE.BufferAttribute
     const R = this.radialSegments
-    const ringValid: Uint8Array[] = []
+    // per-VERTEX validity for the shared index filter: a ring's verdict is
+    // stamped onto its R+1 vertices as the rings are written
+    const vertexValid = new Uint8Array(pos.count)
     let anyInvalid = false
 
     for (let ci = 0; ci < this.centerlines.length; ci++) {
@@ -140,11 +139,11 @@ export class TubeSet extends THREE.Mesh implements S3Renderable {
         const c = centers[i] = proj.project(h)
         const sf = proj.scaleFactor(h)
         radii[i] = this.radiusS3 * (sf / 2)
-        valid[i] = Number.isFinite(c.x + c.y + c.z) && sf < HOLE_LIMIT ? 1 : 0
+        // same near-pole cut as HopfTorusMesh/PointCloud (shared predicate)
+        valid[i] = isProjectable(c, sf) ? 1 : 0
         if (!valid[i]) anyInvalid = true
       }
       if (layout.closed) valid[n] = valid[0]!
-      ringValid.push(valid)
       // 2. tangents (central differences; wrap when closed)
       const tangents: Vec3[] = new Array<Vec3>(n)
       for (let i = 0; i < n; i++) {
@@ -182,10 +181,12 @@ export class TubeSet extends THREE.Mesh implements S3Renderable {
         const center = centers[i]!
         const radius = radii[i]!
         const base = layout.vertexOffset + ri * (R + 1)
+        const ringOk = valid[i]!
         for (let k = 0; k <= R; k++) {
           const a = (2 * Math.PI * k) / R
           const dir = nr.scale(Math.cos(a)).add(br.scale(Math.sin(a)))
-          if (valid[i]) {
+          vertexValid[base + k] = ringOk
+          if (ringOk) {
             pos.setXYZ(base + k, center.x + radius * dir.x, center.y + radius * dir.y, center.z + radius * dir.z)
             nor.setXYZ(base + k, dir.x, dir.y, dir.z)
           } else {
@@ -197,29 +198,10 @@ export class TubeSet extends THREE.Mesh implements S3Renderable {
     }
     pos.needsUpdate = true
     nor.needsUpdate = true
-    // 6. index: drop bands touching invalid rings
-    if (anyInvalid) {
-      const filtered: number[] = []
-      let cursor = 0
-      for (let ci = 0; ci < this.layouts.length; ci++) {
-        const layout = this.layouts[ci]!
-        const valid = ringValid[ci]!
-        const bands = layout.rings - 1
-        const triPerBand = 6 * this.radialSegments
-        for (let b = 0; b < bands; b++) {
-          const okA = valid[b % layout.samples]!
-          const okB = valid[(b + 1) % layout.samples]!
-          if (okA && okB) {
-            for (let t = 0; t < triPerBand; t++) filtered.push(this.fullIndex[cursor + t]!)
-          }
-          cursor += triPerBand
-        }
-      }
-      this.geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(filtered), 1))
-    } else if (this.geometry.getIndex()?.array !== this.fullIndex) {
-      this.geometry.setIndex(new THREE.BufferAttribute(this.fullIndex, 1))
-    }
-    this.geometry.computeBoundingSphere()
+    // 6. index: drop bands touching invalid rings (a band's triangles span
+    // exactly its two bounding rings, so the shared per-vertex filter is
+    // equivalent to the old per-band walk)
+    applyIndexFilter(this.geometry, this.fullIndex, vertexValid, anyInvalid)
   }
 
   private allocate(vertexCount: number): void {

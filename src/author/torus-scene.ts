@@ -49,7 +49,7 @@ export function buildTorusScene(
     // λ is only ℂ-linear when the curve exactly realizes τ; report the 2π
     // rescale (exact for Re τ' = Re τ cases up to the profile's residual —
     // consumers of `lambda` inherit that ≤1e-4 discrepancy)
-    return { hopf, E, positions, flat, lambda: w1.scale(1), flip: false }
+    return { hopf, E, positions, flat, lambda: w1, flip: false }
   }
   // achieved values (recomputed here at the same default sample count) keep
   // matchLattices exact; flip mirrors the lattice and conjugates the points

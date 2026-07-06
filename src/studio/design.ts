@@ -138,6 +138,7 @@ function cloneSpec(spec: StudioSpec): StudioSpec {
     ...(spec.backdrop ? { backdrop: { ...spec.backdrop } } : {}),
     camera: { ...spec.camera, ...(spec.camera.dof ? { dof: { ...spec.camera.dof } } : {}) },
     look: { ...spec.look },
+    ...(spec.trace ? { trace: { ...spec.trace } } : {}),
   }
 }
 

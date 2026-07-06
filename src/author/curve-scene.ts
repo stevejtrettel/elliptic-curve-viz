@@ -82,6 +82,22 @@ export interface CurveSceneOptions {
   onChange?: () => void
 }
 
+/** Batched state change for update(): only the fields present are applied. */
+export interface CurveSceneUpdate {
+  curve?: number | string | CurveData
+  lobes?: number | null
+  /** Explicit profile curve; null = back to the solver's candidates. */
+  profile?: ProfileCurve | null
+  embedding?: number
+  k?: number
+  fibers?: number
+  gridlines?: number
+  colorMode?: ColorMode
+  color?: number
+  subfieldBoost?: boolean
+  view?: Partial<ViewAngles>
+}
+
 export class CurveScene {
   /** S³ content (torus, points, tubes) — add to app.stage. */
   readonly group = new S3Group()
@@ -128,7 +144,7 @@ export class CurveScene {
     this._embedding = 0
 
     this.stageResolve()
-    this._embedding = Math.min(opts.embedding ?? 0, this._candidates.length - 1)
+    this._embedding = Math.max(0, Math.min(opts.embedding ?? 0, this._candidates.length - 1))
     this.computeScene()
 
     const tubeRadius = opts.tubeRadius ?? 0.012
@@ -188,59 +204,103 @@ export class CurveScene {
     return maxFeasibleK(this._curve.data, this.maxPoints)
   }
 
-  // ── setters: assign + rerun the ladder from the named stage ──────────────
+  // ── setters: each is sugar for a one-field update() ──────────────────────
   setCurve(ref: number | string | CurveData): void {
-    this._curve = resolveCurve(ref, this.catalog)
-    this.recompute('resolve')
+    this.update({ curve: ref })
   }
 
   setLobes(n: number | null): void {
-    this._lobes = n
-    this.recompute('resolve')
+    this.update({ lobes: n })
   }
 
   setEmbedding(i: number): void {
-    this._embedding = Math.max(0, Math.min(i, this._candidates.length - 1))
-    this.recompute('build')
+    this.update({ embedding: i })
   }
 
   /** Returns the (possibly clamped) k actually applied. */
   setK(k: number): number {
-    this._k = k
-    this.recompute('build')
+    this.update({ k })
     return this._k
   }
 
   setFibers(n: number): void {
-    this._fibers = n
-    this.recompute('tubes')
+    this.update({ fibers: n })
   }
 
   setGridlines(n: number): void {
-    this._gridlines = n
-    this.recompute('tubes')
+    this.update({ gridlines: n })
   }
 
   setColorMode(m: ColorMode): void {
-    this._colorMode = m
-    this.recompute('style')
+    this.update({ colorMode: m })
   }
 
   /** The single color for colorMode 'uniform'. */
   setColor(hex: number): void {
-    this._color = hex
-    this.recompute('style')
+    this.update({ color: hex })
   }
 
   /** Pin an explicit profile curve (null = back to the solver's candidates). */
   setProfile(p: ProfileCurve | null): void {
-    this._profile = p
-    this.recompute('resolve')
+    this.update({ profile: p })
   }
 
   setSubfieldBoost(on: boolean): void {
-    this._subfieldBoost = on
-    this.recompute('style')
+    this.update({ subfieldBoost: on })
+  }
+
+  /**
+   * Batched change: assign every given field, then run the ladder ONCE from
+   * the earliest affected stage. `scene.update({curve, k, profile})` costs one
+   * recompute where the equivalent setter sequence costs three.
+   */
+  update(u: CurveSceneUpdate): void {
+    let from: Stage | null = null
+    const touch = (s: Stage) => {
+      if (from === null || STAGES.indexOf(s) < STAGES.indexOf(from)) from = s
+    }
+    if (u.curve !== undefined) {
+      this._curve = resolveCurve(u.curve, this.catalog)
+      touch('resolve')
+    }
+    if (u.lobes !== undefined) {
+      this._lobes = u.lobes
+      touch('resolve')
+    }
+    if (u.profile !== undefined) {
+      this._profile = u.profile
+      touch('resolve')
+    }
+    if (u.k !== undefined) {
+      this._k = u.k
+      touch('build')
+    }
+    if (u.embedding !== undefined) touch('build') // applied post-resolve, see recompute
+    if (u.fibers !== undefined) {
+      this._fibers = u.fibers
+      touch('tubes')
+    }
+    if (u.gridlines !== undefined) {
+      this._gridlines = u.gridlines
+      touch('tubes')
+    }
+    if (u.colorMode !== undefined) {
+      this._colorMode = u.colorMode
+      touch('style')
+    }
+    if (u.color !== undefined) {
+      this._color = u.color
+      touch('style')
+    }
+    if (u.subfieldBoost !== undefined) {
+      this._subfieldBoost = u.subfieldBoost
+      touch('style')
+    }
+    if (u.view !== undefined) {
+      Object.assign(this._view, u.view)
+      touch('project')
+    }
+    if (from !== null) this.recompute(from, u.embedding)
   }
 
   /**
@@ -255,16 +315,24 @@ export class CurveScene {
   }
 
   setView(v: Partial<ViewAngles>): void {
-    Object.assign(this._view, v)
-    this.recompute('project')
+    this.update({ view: v })
   }
 
   // ── the ladder ────────────────────────────────────────────────────────────
-  private recompute(from: Stage): void {
+  /**
+   * The embedding index is applied at the build stage, AFTER any resolve has
+   * refreshed the candidate list — so `update({curve, embedding})` clamps
+   * against the new curve's candidates, not the old ones.
+   */
+  private recompute(from: Stage, embedding?: number): void {
     for (const s of STAGES.slice(STAGES.indexOf(from))) {
       if (s === 'resolve') this.stageResolve()
-      else if (s === 'build') this.stageBuild()
-      else if (s === 'tubes') this.stageTubes()
+      else if (s === 'build') {
+        if (embedding !== undefined) {
+          this._embedding = Math.max(0, Math.min(embedding, this._candidates.length - 1))
+        }
+        this.stageBuild()
+      } else if (s === 'tubes') this.stageTubes()
       else if (s === 'style') this.stageStyle()
       else this.stageProject()
     }
@@ -276,7 +344,17 @@ export class CurveScene {
       this._candidates = [profileCandidate(this._profile)]
     } else {
       const tau = tauOf(this._curve.data.form)
-      this._candidates = solveProfileCurve(tau, this._lobes !== null ? { n: this._lobes } : {})
+      let cands = solveProfileCurve(tau, this._lobes !== null ? { n: this._lobes } : {})
+      // a pinned lobe count can be unsolvable for this τ — fall back to auto
+      // rather than leaving the scene without a curve
+      if (cands.length === 0 && this._lobes !== null) cands = solveProfileCurve(tau)
+      this._candidates = cands
+    }
+    if (this._candidates.length === 0) {
+      const tau = tauOf(this._curve.data.form)
+      throw new Error(
+        `solver produced no profile candidates for "${this._curve.label}" (τ = ${tau.re} + ${tau.im}i)`,
+      )
     }
     this._embedding = 0
   }
@@ -350,5 +428,15 @@ export class CurveScene {
     if (this._selected === null) return []
     const { E, lambda, hopf, flip } = this._scene
     return [orbitCurve(E, E.points()[this._selected]!, lambda, hopf, flip)]
+  }
+
+  /** Release every GPU resource owned by the scene's renderables. */
+  dispose(): void {
+    this.torus.dispose()
+    this.points.dispose()
+    this.fiberTubes.dispose()
+    this.edgeTubes.dispose()
+    this.orbitTube.dispose()
+    this.plaque.dispose()
   }
 }

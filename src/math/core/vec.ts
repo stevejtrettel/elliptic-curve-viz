@@ -94,6 +94,18 @@ export class Vec4 {
   }
 }
 
+/** Pack Vec4s into a flat Float64Array of (x, y, z, w) — the S³ cache layout. */
+export function packVec4s(points: readonly Vec4[]): Float64Array {
+  const arr = new Float64Array(4 * points.length)
+  points.forEach((p, i) => {
+    arr[4 * i] = p.x
+    arr[4 * i + 1] = p.y
+    arr[4 * i + 2] = p.z
+    arr[4 * i + 3] = p.w
+  })
+  return arr
+}
+
 /**
  * Generalized cross product in ℝ⁴: the unique vector orthogonal to a, b, c
  * with |a ∧ b ∧ c| magnitude, via cofactor expansion of det(e; a; b; c).

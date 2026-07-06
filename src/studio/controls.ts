@@ -5,10 +5,37 @@
  * buttons. The tab re-renders itself after a picker swap.
  */
 import type { App } from './app'
-import type { ControlPanel } from './panel'
+import type { ControlPanel, Tab } from './panel'
 import type { StudioSpec } from './specs'
 import type { StudioHandle } from './studio'
 import { STUDIOS } from './studios'
+
+/**
+ * The shared path-trace quality knobs (bounces, glass bounces, fast preview) —
+ * composed by addStudioControls and by demos with bespoke panel layouts, so
+ * the ranges live in exactly one place.
+ */
+export function addTraceControls(tab: Tab, app: App): void {
+  tab.slider('Bounces', { min: 2, max: 40, step: 1, value: app.trace.bounces }, (v) => {
+    app.trace.bounces = v
+    app.applyTraceSettings()
+    app.invalidate()
+  })
+
+  tab.slider('Glass bounces', { min: 4, max: 30, step: 1, value: app.trace.transmissiveBounces }, (v) => {
+    app.trace.transmissiveBounces = v
+    app.applyTraceSettings()
+    app.invalidate()
+  })
+
+  // dithered low-res compositing while accumulating: faster interaction, but
+  // the whole image reads "rough" until it resolves — off by default
+  tab.toggle('Fast preview (low-res)', app.trace.dynamicLowRes, (v) => {
+    app.trace.dynamicLowRes = v
+    app.applyTraceSettings()
+    app.invalidate()
+  })
+}
 
 export interface StudioControlsOptions {
   /** Called to collect the reproducibility descriptor for render-final sidecars. */
@@ -20,12 +47,21 @@ export interface StudioControlsOptions {
   onStudioChange?: (handle: StudioHandle) => void
 }
 
+export interface StudioControlsHandle {
+  /**
+   * Re-render the tab against a new StudioHandle — required after ANY
+   * app.setStudio outside the picker (e.g. a Design-tab edit), because the
+   * light sliders close over the compiled handle's lights.
+   */
+  setHandle(handle: StudioHandle): void
+}
+
 export function addStudioControls(
   panel: ControlPanel,
   app: App,
   handle: StudioHandle,
   opts: StudioControlsOptions = {},
-): void {
+): StudioControlsHandle {
   const tab = panel.tab('Studio')
   // registry + the incoming spec when it is not a registered one (custom studios stay pickable)
   const registry: Record<string, StudioSpec> = {
@@ -76,25 +112,7 @@ export function addStudioControls(
       })
     })
 
-    tab.slider('Bounces', { min: 2, max: 20, step: 1, value: app.trace.bounces }, (v) => {
-      app.trace.bounces = v
-      app.applyTraceSettings()
-      app.invalidate()
-    })
-
-    tab.slider('Glass bounces', { min: 4, max: 30, step: 1, value: app.trace.transmissiveBounces }, (v) => {
-      app.trace.transmissiveBounces = v
-      app.applyTraceSettings()
-      app.invalidate()
-    })
-
-    // dithered low-res compositing while accumulating: faster interaction, but
-    // the whole image reads "rough" until it resolves — off by default
-    tab.toggle('Fast preview (low-res)', app.trace.dynamicLowRes, (v) => {
-      app.trace.dynamicLowRes = v
-      app.applyTraceSettings()
-      app.invalidate()
-    })
+    addTraceControls(tab, app)
 
     const target = tab.slider('Final samples', { min: 32, max: 1024, step: 32, value: 256 }, () => undefined)
 
@@ -114,4 +132,5 @@ export function addStudioControls(
   }
 
   render(handle)
+  return { setHandle: render }
 }

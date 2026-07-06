@@ -22,10 +22,12 @@
  *
  * Scriptable: ?curve=N&k=M&rig=top|threequarter&alpha=…&trace=1&blocktrace=S.
  */
-import { CurveScene, maxFeasibleK, paperProfile, paperRadius } from '@/author'
+import { CurveScene, type LabeledCurve, decodeParams, maxFeasibleK, paperRadius } from '@/author'
 import { parseCurveDescriptors, parsePresentation } from '@/io'
 import { tauOf } from '@/math/arithmetic'
-import { colored, glass } from '@/geometry'
+import { type PaperFamilySolution, solvePaperFamily } from '@/math/families'
+import type { ProfileCurve } from '@/math/hopf'
+import { glass, solidSurface } from '@/geometry'
 import { App, ControlPanel, addStudioControls, addStudioDesign, bridgesPaper } from '@/studio'
 
 import rawCurves from './curves.json'
@@ -47,17 +49,35 @@ const CAMERA_RIGS = {
 }
 
 const MAX_POINTS = 20000
-const params = new URLSearchParams(location.search)
-const num = (name: string, dflt: number) => (params.has(name) ? Number(params.get(name)) : dflt)
+const url = decodeParams(location.search)
 
-let curveIdx = num('curve', 0)
-let k = num('k', 2)
+let curveIdx = url.curve ?? 0
+let k = url.k ?? 2
 // the paper's dense figures are top-down; hero shots switch to three-quarter
-let rig: keyof typeof CAMERA_RIGS = params.get('rig') === 'threequarter' ? 'threequarter' : 'top'
+let rig: keyof typeof CAMERA_RIGS = url.rig === 'threequarter' ? 'threequarter' : 'top'
+
+// S² profile: SOLVED from τ in the paper's own family — the specified a and
+// n (presentation.json) are the aesthetics; the amplitude b is determined
+// exactly by L = 4π·Im τ. Curves without a profile spec use the general
+// solver's candidate (rectangular τ ⇒ the exact latitude circle).
+const solvedCache = new Map<string, PaperFamilySolution | null>()
+
+function solvedFor(lc: LabeledCurve): PaperFamilySolution | null {
+  const prof = lc.paper?.profile
+  if (!prof) return null
+  if (!solvedCache.has(lc.label)) {
+    solvedCache.set(lc.label, solvePaperFamily(tauOf(lc.data.form), prof.n, { a: prof.a, samples: 256 }))
+  }
+  return solvedCache.get(lc.label)!
+}
+
+function currentProfile(lc: LabeledCurve): ProfileCurve | null {
+  return solvedFor(lc)?.curve ?? null
+}
 
 const app = new App()
 const first = CURVES[curveIdx]!
-const firstProfile = paperProfile(first)
+const firstProfile = currentProfile(first)
 const scene = new CurveScene({
   curves: CURVES,
   curve: curveIdx,
@@ -77,12 +97,16 @@ scene.group.rotation.x = -Math.PI / 2
 
 function applyPresentation(): void {
   const lc = CURVES[curveIdx]!
-  scene.setProfile(paperProfile(lc)) // resolve tier: also reruns build/style
-  scene.setCurve(curveIdx)
-  k = scene.setK(k)
-  scene.setColor(lc.paper?.color ?? 0xd43b3b)
+  // ONE ladder run for the whole change (profile+curve are resolve-tier, k build-tier)
+  scene.update({
+    profile: currentProfile(lc),
+    curve: curveIdx,
+    k,
+    color: lc.paper?.color ?? 0xd43b3b,
+  })
+  k = scene.k // update() clamps k to the feasible range
   scene.points.setBaseRadius(paperRadius(lc, k))
-  scene.torus.setMaterial(lc.paper?.surface === 'glass' ? glass(0xffffff) : colored(0xc9eaff))
+  scene.torus.setMaterial(lc.paper?.surface === 'glass' ? glass(0xffffff) : solidSurface(0xc9eaff))
   updateInfo()
   app.frame(CAMERA_RIGS[rig])
   app.invalidate()
@@ -139,13 +163,13 @@ function updateInfo(): void {
   const tau = tauOf(lc.data.form)
   info.tau.set(`${tau.re.toFixed(4)} + ${tau.im.toFixed(4)}i`)
   const prof = lc.paper?.profile
-  if (prof) {
-    // specified: the paper's hand-tuned curve, from this entry's paper block
-    // in data/curves.json — points laid in the curve's OWN lattice
-    info.profile.set(`paper values a=${prof.a}, b=${prof.b}, n=${prof.n} (./presentation.json)`)
+  const sol = solvedFor(lc)
+  if (prof && sol) {
+    // aesthetics a, n specified (./presentation.json); b solved from τ
+    info.profile.set(`a=${prof.a}, n=${prof.n} specified · b=${sol.b.toFixed(4)} solved from τ`)
     info.family.set('φ = π/2 + ab·cos(nt), θ = t + a·sin(2nt)')
   } else {
-    // solved: solveProfileCurve(τ) — rectangular τ ⇒ the exact latitude circle
+    // no profile spec: solveProfileCurve(τ) — rectangular τ ⇒ latitude circle
     info.profile.set('solved from τ (solveProfileCurve)')
     info.family.set('latitude circle φ = const')
   }
@@ -175,18 +199,17 @@ tab.dropdown(
 // pose matching against the paper figures: rotate the torus IN S³ (not the
 // camera) until it matches, then we bake the numbers (?alpha=&beta=&gamma=&pole=)
 const pose = (name: 'alpha' | 'beta' | 'gamma' | 'pole', max: number) =>
-  tab.slider(`Pose ${name === 'pole' ? 'pole tilt' : name}`, { min: 0, max, step: 0.01, value: num(name, 0) }, (v) =>
+  tab.slider(`Pose ${name === 'pole' ? 'pole tilt' : name}`, { min: 0, max, step: 0.01, value: url[name] ?? 0 }, (v) =>
     scene.setView({ [name]: v }),
   )
 pose('alpha', 2 * Math.PI)
 pose('beta', 2 * Math.PI)
 pose('gamma', Math.PI)
 pose('pole', Math.PI)
-scene.setView({ alpha: num('alpha', 0), beta: num('beta', 0), gamma: num('gamma', 0), pole: num('pole', 0) })
+scene.setView({ alpha: url.alpha ?? 0, beta: url.beta ?? 0, gamma: url.gamma ?? 0, pole: url.pole ?? 0 })
 
 // ── studio + boot ───────────────────────────────────────────────────────────
-app.trace.bounces = 30 // the paper's figures traced at 30 bounces
-const handle = app.setStudio(bridgesPaper)
+const handle = app.setStudio(bridgesPaper) // bridges-paper carries the paper's 30 bounces
 addStudioControls(panel, app, handle, {
   renderName: 'torus-lift',
   sidecar: () => {
@@ -203,12 +226,12 @@ addStudioControls(panel, app, handle, {
   },
 })
 // ?design=1: live-edit the studio against a real figure, Copy spec to keep it
-if (params.get('design') === '1') addStudioDesign(panel, app, bridgesPaper)
+if (url.design) addStudioDesign(panel, app, bridgesPaper)
 panel.mount(document.body)
 
 applyPresentation()
-if (params.get('trace') === '1') app.mode = 'trace'
-if (params.has('blocktrace')) app.stepTrace(Number(params.get('blocktrace')))
+if (url.trace) app.mode = 'trace'
+if (url.blocktrace !== undefined) app.stepTrace(url.blocktrace)
 app.start()
 
 export {}

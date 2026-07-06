@@ -11,12 +11,11 @@ import * as THREE from 'three'
 import { Vec4 } from '@/math/core'
 import { HopfTorus, S3Projection, framePoint } from '@/math/hopf'
 
+import { applyIndexFilter, isProjectable } from './holes'
 import { glass } from './materials'
 import type { S3Renderable } from './s3group'
 
 const TWO_PI = 2 * Math.PI
-/** ℝ³ positions beyond this are "at the projection pole" — cut a hole. */
-const HOLE_LIMIT = 1e6
 
 export interface HopfTorusMeshOptions {
   /** Fiber-direction segments (default 128). */
@@ -88,7 +87,7 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
     if (this.lastProjection) this.reproject(this.lastProjection)
   }
 
-  /** EXPENSIVE — set the live-mode grid and reallocate; follow with setSurface. */
+  /** EXPENSIVE — set the live-mode grid; resamples immediately (like setMode). */
   setResolution(uSegments: number, xSegments: number): void {
     this.segsLive[0] = uSegments
     this.segsLive[1] = xSegments
@@ -96,12 +95,19 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
     this.uSegs = uSegments
     this.xSegs = xSegments
     this.allocate()
-    this.lastProjection = null // caches are stale until the next setSurface
+    this.setSurface(this.hopf) // refills the S³ caches and reprojects
   }
 
-  /** CHEAP. */
+  /** CHEAP. Takes ownership: the replaced material is disposed. */
   setMaterial(material: THREE.Material): void {
+    if (material !== this.material) (this.material as THREE.Material).dispose()
     this.material = material
+  }
+
+  /** Release the geometry and current material. */
+  dispose(): void {
+    this.geometry.dispose()
+    ;(this.material as THREE.Material).dispose()
   }
 
   /** O(vertices): derive ℝ³ positions + normals from the S³ cache. */
@@ -118,12 +124,7 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
       const p = proj.project(h)
       // near the projection pole the clamp can return small values (exactly at
       // the pole, even 0) — the conformal factor is the honest blow-up signal
-      const ok =
-        Number.isFinite(p.x + p.y + p.z) &&
-        proj.scaleFactor(h) < HOLE_LIMIT &&
-        Math.abs(p.x) < HOLE_LIMIT &&
-        Math.abs(p.y) < HOLE_LIMIT &&
-        Math.abs(p.z) < HOLE_LIMIT
+      const ok = isProjectable(p, proj.scaleFactor(h))
       valid[v] = ok ? 1 : 0
       if (!ok) {
         anyInvalid = true
@@ -144,18 +145,7 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
     pos.needsUpdate = true
     nor.needsUpdate = true
     // index: the full grid, minus quads touching an invalid vertex
-    if (anyInvalid) {
-      const filtered: number[] = []
-      for (let t = 0; t < this.fullIndex.length; t += 3) {
-        if (valid[this.fullIndex[t]!]! && valid[this.fullIndex[t + 1]!]! && valid[this.fullIndex[t + 2]!]!) {
-          filtered.push(this.fullIndex[t]!, this.fullIndex[t + 1]!, this.fullIndex[t + 2]!)
-        }
-      }
-      this.geometry.setIndex(new THREE.BufferAttribute(new Uint32Array(filtered), 1))
-    } else if (this.geometry.getIndex()?.array !== this.fullIndex) {
-      this.geometry.setIndex(new THREE.BufferAttribute(this.fullIndex, 1))
-    }
-    this.geometry.computeBoundingSphere()
+    applyIndexFilter(this.geometry, this.fullIndex, valid, anyInvalid)
   }
 
   private allocate(): void {

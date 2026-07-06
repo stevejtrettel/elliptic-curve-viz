@@ -36,3 +36,11 @@ export function matte(color: THREE.ColorRepresentation = 0xf0f0f0): THREE.MeshPh
 export function colored(color: THREE.ColorRepresentation = 0xffffff): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({ color, roughness: 0.5, metalness: 0 })
 }
+
+/**
+ * Opaque torus surface: DOUBLE-sided — wavy embeddings expose their inner
+ * face. (Glass stays FrontSide: the tracer's transmission needs it.)
+ */
+export function solidSurface(color: THREE.ColorRepresentation = 0xc9eaff): THREE.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({ color, roughness: 0.5, metalness: 0, side: THREE.DoubleSide })
+}

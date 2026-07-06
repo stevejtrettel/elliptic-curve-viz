@@ -150,7 +150,7 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
     studio = app.setStudio(base)
     if (panel) {
       let design: StudioDesignHandle | null = null
-      addStudioControls(panel, app, studio, {
+      const studioControls = addStudioControls(panel, app, studio, {
         renderName: title,
         sidecar: () => ({
           curve: scene.curve.label,
@@ -169,15 +169,21 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
         },
       })
       if (spec.design || url.design) {
-        design = addStudioDesign(panel, app, base, (h) => (studio = h))
+        // Design edits recompile the studio; the Studio tab must re-render
+        // against the new handle or its light sliders mutate detached lights.
+        design = addStudioDesign(panel, app, base, (h) => {
+          studio = h
+          studioControls.setHandle(h)
+        })
       }
     }
   }
 
   if (panel) panel.mount(document.body)
 
+  // diagnostic, opt-in: `fps: true` in the spec
   let fpsStop: (() => void) | null = null
-  if (spec.fps !== false) fpsStop = fpsMeter()
+  if (spec.fps) fpsStop = fpsMeter()
 
   frame()
   if (url.trace) app.mode = 'trace'
@@ -197,6 +203,7 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
       picking?.dispose()
       fpsStop?.()
       panel?.domElement.remove()
+      scene.dispose()
       app.dispose()
     },
   }

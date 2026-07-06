@@ -21,9 +21,12 @@ export function enableOrbitPicking(app: App, scene: CurveScene): { dispose(): vo
   const onDown = (e: PointerEvent) => (downAt = [e.clientX, e.clientY])
   const onUp = (e: PointerEvent) => {
     if (!downAt || Math.hypot(e.clientX - downAt[0], e.clientY - downAt[1]) > 5) return
+    // NDC relative to the canvas box, not the window — App may be mounted
+    // in an embedded (non-fullscreen) element
+    const box = el.getBoundingClientRect()
     const ndc = new THREE.Vector2(
-      (e.clientX / window.innerWidth) * 2 - 1,
-      -(e.clientY / window.innerHeight) * 2 + 1,
+      ((e.clientX - box.left) / box.width) * 2 - 1,
+      -((e.clientY - box.top) / box.height) * 2 + 1,
     )
     raycaster.setFromCamera(ndc, app.camera)
     const idx = scene.points.instanceAt(raycaster)

@@ -17,6 +17,22 @@ export interface StudioSpec {
   backdrop?: BackdropSpec
   camera: CameraSpec
   look: LookSpec
+  /** Path-trace quality this look NEEDS (e.g. deep glass → many bounces). */
+  trace?: TraceQualitySpec
+}
+
+/**
+ * The studio-owned slice of the trace settings: quality the LOOK depends on.
+ * Session knobs (samples target, tiles, render scale, progress) stay on
+ * app.trace. setStudio applies these over the defaults — and resets to the
+ * defaults when a spec omits them, so studios never inherit each other's.
+ */
+export interface TraceQualitySpec {
+  bounces?: number
+  /** Extra bounces through glass — raise for thick/stacked transmission. */
+  transmissiveBounces?: number
+  /** 0.25–1 tames fireflies on glossy surfaces. */
+  filterGlossyFactor?: number
 }
 
 // ── environment ─────────────────────────────────────────────────────────────

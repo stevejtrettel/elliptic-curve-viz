@@ -4,3 +4,4 @@
  * equatorial wavy (1-param), general wavy (2-param Newton). Returns Candidate[].
  */
 export * from './solver'
+export * from './family-solve'

@@ -11,14 +11,14 @@
  */
 import * as THREE from 'three'
 
-import { Vec4 } from '@/math/core'
+import { Vec4, packVec4s } from '@/math/core'
 import { S3Projection } from '@/math/hopf'
 
-import { bakeInstancedMesh } from './bake-instanced'
+import { TraceBaker } from './bake-instanced'
+import { isProjectable } from './holes'
 import { colored } from './materials'
 import type { S3Renderable } from './s3group'
 
-const HOLE_LIMIT = 1e6
 const ZERO_MATRIX = new THREE.Matrix4().set(0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0)
 
 export interface PointCloudOptions {
@@ -38,16 +38,14 @@ export class PointCloud extends THREE.Group implements S3Renderable {
   private sizes: number[] | null
   private lastProjection: S3Projection | null = null
   private readonly dummy = new THREE.Object3D()
-  private traceMesh: THREE.Mesh | null = null
-  private traceDirty = true
-  private displayMode: 'live' | 'trace' = 'live'
+  private readonly baker = new TraceBaker(this, () => this.mesh)
 
   constructor(pointsS3: Vec4[], opts: PointCloudOptions = {}) {
     super()
     this.baseRadius = opts.baseRadius ?? 0.03
     this.sizes = opts.sizes ?? null
     this.pointCount = pointsS3.length
-    this.points4 = packPoints(pointsS3)
+    this.points4 = packVec4s(pointsS3)
     this.mesh = this.buildMesh(opts.material)
     this.add(this.mesh)
     if (opts.colors) this.setColors(opts.colors)
@@ -73,20 +71,22 @@ export class PointCloud extends THREE.Group implements S3Renderable {
       this.mesh.setColorAt(i, c)
     }
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true
-    this.invalidateBake()
+    this.baker.invalidate()
   }
 
   /** EXPENSIVE — new point set; reallocates only if the count changed. */
   setPoints(pointsS3: Vec4[], colors?: Float32Array, sizes?: number[] | null): void {
     if (pointsS3.length !== this.pointCount) {
       this.remove(this.mesh)
+      this.mesh.geometry.dispose()
       this.mesh.dispose()
       this.pointCount = pointsS3.length
-      this.points4 = packPoints(pointsS3)
+      this.points4 = packVec4s(pointsS3)
       this.mesh = this.buildMesh(this.mesh.material as THREE.Material)
+      this.mesh.visible = this.baker.mode === 'live'
       this.add(this.mesh)
     } else {
-      this.points4 = packPoints(pointsS3)
+      this.points4 = packVec4s(pointsS3)
     }
     if (sizes !== undefined) this.sizes = sizes
     if (colors) this.setColors(colors)
@@ -112,20 +112,20 @@ export class PointCloud extends THREE.Group implements S3Renderable {
       const at = 4 * i
       const h = new Vec4(this.points4[at]!, this.points4[at + 1]!, this.points4[at + 2]!, this.points4[at + 3]!)
       const p = proj.project(h)
-      const scale = this.baseRadius * (this.sizes?.[i] ?? 1) * (proj.scaleFactor(h) / 2)
-      const ok = Number.isFinite(p.x + p.y + p.z) && Math.abs(p.x) < HOLE_LIMIT && scale < HOLE_LIMIT
-      if (!ok) {
+      const sf = proj.scaleFactor(h)
+      // same near-pole cut as HopfTorusMesh/TubeSet (shared predicate)
+      if (!isProjectable(p, sf)) {
         this.mesh.setMatrixAt(i, ZERO_MATRIX)
         continue
       }
       this.dummy.position.set(p.x, p.y, p.z)
-      this.dummy.scale.setScalar(scale)
+      this.dummy.scale.setScalar(this.baseRadius * (this.sizes?.[i] ?? 1) * (sf / 2))
       this.dummy.updateMatrix()
       this.mesh.setMatrixAt(i, this.dummy.matrix)
     }
     this.mesh.instanceMatrix.needsUpdate = true
     this.mesh.computeBoundingSphere()
-    this.invalidateBake()
+    this.baker.invalidate()
   }
 
   /**
@@ -133,28 +133,16 @@ export class PointCloud extends THREE.Group implements S3Renderable {
    * (DESIGN §6: the tracer has no instancing; bake is lazy, color-only).
    */
   setMode(mode: 'live' | 'trace'): void {
-    this.displayMode = mode
-    if (mode === 'trace') this.ensureBake()
-    this.mesh.visible = mode === 'live'
-    if (this.traceMesh) this.traceMesh.visible = mode === 'trace'
+    this.baker.setMode(mode)
   }
 
-  private invalidateBake(): void {
-    this.traceDirty = true
-    if (this.displayMode === 'trace') this.ensureBake()
-  }
-
-  private ensureBake(): void {
-    if (!this.traceDirty && this.traceMesh) return
-    if (this.traceMesh) {
-      this.remove(this.traceMesh)
-      this.traceMesh.geometry.dispose()
-      ;(this.traceMesh.material as THREE.Material).dispose()
-    }
-    this.traceMesh = bakeInstancedMesh(this.mesh)
-    this.traceMesh.visible = this.displayMode === 'trace'
-    this.add(this.traceMesh)
-    this.traceDirty = false
+  /** Release every GPU resource this renderable created (mesh, bake, material). */
+  dispose(): void {
+    this.baker.dispose()
+    this.remove(this.mesh)
+    this.mesh.geometry.dispose()
+    ;(this.mesh.material as THREE.Material).dispose()
+    this.mesh.dispose()
   }
 
   private buildMesh(material?: THREE.Material): THREE.InstancedMesh {
@@ -166,13 +154,3 @@ export class PointCloud extends THREE.Group implements S3Renderable {
   }
 }
 
-function packPoints(points: Vec4[]): Float64Array {
-  const arr = new Float64Array(4 * points.length)
-  points.forEach((p, i) => {
-    arr[4 * i] = p.x
-    arr[4 * i + 1] = p.y
-    arr[4 * i + 2] = p.z
-    arr[4 * i + 3] = p.w
-  })
-  return arr
-}

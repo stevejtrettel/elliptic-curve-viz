@@ -35,6 +35,9 @@ export interface AppOptions {
   antialias?: boolean
 }
 
+/** Trace-quality defaults; StudioSpec.trace overrides these per studio. */
+const TRACE_QUALITY_DEFAULTS = { bounces: 8, transmissiveBounces: 12, filterGlossyFactor: 0.25 }
+
 export class App {
   readonly renderer: THREE.WebGLRenderer
   readonly scene = new THREE.Scene()
@@ -43,9 +46,7 @@ export class App {
   /** Content lives here; studios never touch it. */
   readonly stage = new THREE.Group()
   readonly trace: TraceSettings = {
-    bounces: 8,
-    transmissiveBounces: 12,
-    filterGlossyFactor: 0.25,
+    ...TRACE_QUALITY_DEFAULTS,
     stableNoise: false,
     renderScale: 1,
     tiles: [2, 2],
@@ -59,21 +60,30 @@ export class App {
   private studioGroup: THREE.Group | null = null
   private cameraSpec: CameraSpec | null = null
   private running = false
+  private readonly mount: HTMLElement
+  /** No explicit mount → track the window; otherwise track the mount's client box. */
+  private readonly fullWindow: boolean
+  private readonly noDof: { fStop: number; focusDistance: number }
 
   constructor(opts: AppOptions = {}) {
     // NO preserveDrawingBuffer: it is a severe frame-rate hit on some drivers
     // (macOS ANGLE/Metal); screenshot() re-renders synchronously before toBlob.
     this.renderer = new THREE.WebGLRenderer({ antialias: opts.antialias ?? true })
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.outputColorSpace = THREE.SRGBColorSpace
     // the raster transmission pass re-renders the scene into a mipmapped target
     // whenever glass is visible — half resolution there is visually invisible
     // through rough glass and roughly halves the live-mode frame cost
     this.renderer.transmissionResolutionScale = 0.5
-    ;(opts.mount ?? document.body).appendChild(this.renderer.domElement)
-    this.camera = new PhysicalCamera(45, window.innerWidth / window.innerHeight, 0.01, 500)
+    this.mount = opts.mount ?? document.body
+    this.fullWindow = !opts.mount
+    this.mount.appendChild(this.renderer.domElement)
+    const [w, h] = this.viewSize()
+    this.renderer.setSize(w, h)
+    this.camera = new PhysicalCamera(45, w / h, 0.01, 500)
+    // library defaults, restored by frame() when a studio has no dof spec
+    this.noDof = { fStop: this.camera.fStop, focusDistance: this.camera.focusDistance }
     this.camera.position.set(3, 2, 4)
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.scene.add(this.stage)
@@ -111,6 +121,12 @@ export class App {
     this.scene.backgroundBlurriness = spec.environment.background === 'blur' ? 0.6 : 0
     this.renderer.toneMapping = TONE_MAPPING[spec.look.toneMapping ?? 'aces']
     this.renderer.toneMappingExposure = spec.look.exposure ?? 1
+    // trace QUALITY is part of the studio's look; absent fields reset to the
+    // defaults so studios never inherit each other's settings
+    this.trace.bounces = spec.trace?.bounces ?? TRACE_QUALITY_DEFAULTS.bounces
+    this.trace.transmissiveBounces = spec.trace?.transmissiveBounces ?? TRACE_QUALITY_DEFAULTS.transmissiveBounces
+    this.trace.filterGlossyFactor = spec.trace?.filterGlossyFactor ?? TRACE_QUALITY_DEFAULTS.filterGlossyFactor
+    this.applyTraceSettings()
     this.cameraSpec = spec.camera
     if (this._mode === 'trace') this.invalidate()
     return compiled.handle
@@ -128,6 +144,11 @@ export class App {
       this.camera.fStop = spec.dof.fstop
       this.camera.focusDistance = spec.dof.focus === 'auto' ? placed.distance : spec.dof.focus
       this.camera.bokehSize = 0 // let fStop/focalLength drive; bokehSize setter overrides fStop
+    } else {
+      // a dof-less studio must not inherit the previous studio's aperture
+      this.camera.fStop = this.noDof.fStop
+      this.camera.focusDistance = this.noDof.focusDistance
+      this.camera.bokehSize = 0
     }
     this.camera.updateProjectionMatrix()
     this.controls.update()
@@ -249,9 +270,12 @@ export class App {
   dispose(): void {
     this.running = false
     window.removeEventListener('resize', this.onResize)
+    this.controls.dispose()
     this.handle?.dispose()
+    if (this.studioGroup) this.scene.remove(this.studioGroup)
     this.pathTracer?.dispose()
     this.renderer.dispose()
+    this.renderer.domElement.remove()
   }
 
   private loop = (): void => {
@@ -292,10 +316,16 @@ export class App {
     else this.pathTracer.updateCamera()
   }
 
+  private viewSize(): [number, number] {
+    if (this.fullWindow) return [window.innerWidth, window.innerHeight]
+    return [Math.max(1, this.mount.clientWidth), Math.max(1, this.mount.clientHeight)]
+  }
+
   private onResize = (): void => {
-    this.camera.aspect = window.innerWidth / window.innerHeight
+    const [w, h] = this.viewSize()
+    this.camera.aspect = w / h
     this.camera.updateProjectionMatrix()
-    this.renderer.setSize(window.innerWidth, window.innerHeight)
+    this.renderer.setSize(w, h)
   }
 }
 

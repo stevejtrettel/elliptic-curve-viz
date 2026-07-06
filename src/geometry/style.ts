@@ -16,6 +16,11 @@ export const PALETTES = {
 
 const DEFAULT = PALETTES.classic
 
+/** Map key for a TorusPoint (exact integer coordinates). */
+function pointKey(P: TorusPoint): string {
+  return `${P.x},${P.y}`
+}
+
 function fill(colors: Float32Array, i: number, c: THREE.Color): void {
   colors[3 * i] = c.r
   colors[3 * i + 1] = c.g
@@ -48,9 +53,9 @@ export function colorByOrbit(E: CurvePoints, palette = DEFAULT): Float32Array {
   const colors = new Float32Array(3 * pts.length)
   const slot = new Map<string, number>()
   E.orbits().forEach((orbit, o) => {
-    for (const P of orbit.points) slot.set(`${P.x},${P.y}`, o)
+    for (const P of orbit.points) slot.set(pointKey(P), o)
   })
-  pts.forEach((P, i) => fill(colors, i, palette[slot.get(`${P.x},${P.y}`)! % palette.length]!))
+  pts.forEach((P, i) => fill(colors, i, palette[slot.get(pointKey(P))! % palette.length]!))
   return colors
 }
 
@@ -62,8 +67,8 @@ export function uniformColors(count: number, hex: number): Float32Array {
   return colors
 }
 
-/** Number of prime factors with multiplicity (depth of the subfield tower step). */
-function omega(n: number): number {
+/** Ω(n) — number of prime factors with multiplicity (subfield tower depth). */
+function bigOmega(n: number): number {
   let m = n
   let count = 0
   for (let q = 2; q * q <= m; q++) {
@@ -82,7 +87,7 @@ function omega(n: number): number {
  */
 export function sizeByDegree(E: CurvePoints, opts: { subfieldBoost?: number } = {}): number[] {
   const boost = opts.subfieldBoost ?? 1.6
-  return E.points().map((P) => Math.pow(boost, omega(E.k / E.degree(P))))
+  return E.points().map((P) => Math.pow(boost, bigOmega(E.k / E.degree(P))))
 }
 
 /** Emphasize one Frobenius orbit: its points get `boost`, everything else 1. */
@@ -90,8 +95,8 @@ export function highlightOrbit(E: CurvePoints, P: TorusPoint, boost = 2): number
   const inOrbit = new Set<string>()
   let Q = P
   do {
-    inOrbit.add(`${Q.x},${Q.y}`)
+    inOrbit.add(pointKey(Q))
     Q = E.frobenius(Q)
   } while (Q.x !== P.x || Q.y !== P.y)
-  return E.points().map((R) => (inOrbit.has(`${R.x},${R.y}`) ? boost : 1))
+  return E.points().map((R) => (inOrbit.has(pointKey(R)) ? boost : 1))
 }

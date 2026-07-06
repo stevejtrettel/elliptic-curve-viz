@@ -7,10 +7,14 @@
  */
 import type { CurveData } from '@/math/arithmetic'
 
-/** How the paper presents this curve (lifting-modp hand-tuned values). */
+/** How the paper presents this curve — the renderer-side aesthetics. */
 export interface PaperStyle {
-  /** Legacy wavy profile φ=π/2+a·b·cos(nt), θ=t+a·sin(2nt); omitted = solver default. */
-  profile?: { a: number; b: number; n: number }
+  /**
+   * Paper-family aesthetics: skew a and lobe count n of
+   * φ = π/2 + a·b·cos(nt), θ = t + a·sin(2nt); the amplitude factor b is
+   * SOLVED from τ (solvePaperFamily). Omitted = solver default.
+   */
+  profile?: { a: number; n: number }
   /** The discriminant's color in the paper. */
   color?: number
   /** Hand-tuned base point radius per field extension k. */
@@ -63,7 +67,8 @@ function parseDescriptor(entry: unknown, i: number): LabeledCurve {
   const disc = form.b * form.b - 4n * form.a * form.c
   const frob = trace * trace - 4n * p
   if (disc >= 0n) throw new Error(`${at}: form discriminant b²−4ac = ${disc} must be negative`)
-  if (Number(trace) * Number(trace) > 4 * Number(p)) {
+  // Hasse |a| ≤ 2√p ⟺ trace² − 4p ≤ 0, exactly (no float round-trip)
+  if (frob > 0n) {
     throw new Error(`${at}: Hasse bound violated — trace² = ${trace * trace} exceeds 4p = ${4n * p}`)
   }
   if (frob % disc !== 0n || !isPerfectSquare(frob / disc)) {
@@ -83,7 +88,7 @@ function parseDescriptor(entry: unknown, i: number): LabeledCurve {
   const data: CurveData = { form, trace, p, sign, ...(equation ? { equation } : {}) }
   const label = rec['label']
   if (label !== undefined && typeof label !== 'string') throw new Error(`${at}.label: expected a string`)
-  const paper = parsePaper(rec['paper'], at)
+  const paper = parsePaper(rec['paper'], `${at}.paper`)
   return { label: label ?? describeCurve(data), data, ...(paper ? { paper } : {}) }
 }
 
@@ -106,32 +111,36 @@ export function parsePresentation(json: unknown): Record<string, PaperStyle> {
 
 function parsePaper(raw: unknown, at: string): PaperStyle | undefined {
   if (raw === undefined) return undefined
-  if (typeof raw !== 'object' || raw === null) throw new Error(`${at}.paper: expected an object`)
+  if (typeof raw !== 'object' || raw === null) throw new Error(`${at}: expected an object`)
   const rec = raw as Record<string, unknown>
   const paper: PaperStyle = {}
   if (rec['profile'] !== undefined) {
-    const p = rec['profile'] as Record<string, unknown>
-    const prof = { a: Number(p['a']), b: Number(p['b']), n: Number(p['n']) }
-    if (![prof.a, prof.b, prof.n].every(Number.isFinite)) throw new Error(`${at}.paper.profile: expected {a, b, n}`)
+    const p = rec['profile']
+    if (typeof p !== 'object' || p === null) throw new Error(`${at}.profile: expected {a, n}`)
+    const pr = p as Record<string, unknown>
+    const prof = { a: Number(pr['a']), n: Number(pr['n']) }
+    if (![prof.a, prof.n].every(Number.isFinite)) throw new Error(`${at}.profile: expected {a, n}`)
     paper.profile = prof
   }
   if (rec['color'] !== undefined) {
     const c = typeof rec['color'] === 'number' ? rec['color'] : parseInt(String(rec['color']).replace(/^0x/, ''), 16)
-    if (!Number.isInteger(c) || c < 0) throw new Error(`${at}.paper.color: expected a hex color`)
+    if (!Number.isInteger(c) || c < 0) throw new Error(`${at}.color: expected a hex color`)
     paper.color = c
   }
   if (rec['radiusByK'] !== undefined) {
+    const rk = rec['radiusByK']
+    if (typeof rk !== 'object' || rk === null) throw new Error(`${at}.radiusByK: expected integer k → radius`)
     const table: Record<number, number> = {}
-    for (const [k, r] of Object.entries(rec['radiusByK'] as Record<string, unknown>)) {
+    for (const [k, r] of Object.entries(rk as Record<string, unknown>)) {
       const kk = Number(k)
       const rr = Number(r)
-      if (!Number.isInteger(kk) || !Number.isFinite(rr)) throw new Error(`${at}.paper.radiusByK: integer k → radius`)
+      if (!Number.isInteger(kk) || !Number.isFinite(rr)) throw new Error(`${at}.radiusByK: integer k → radius`)
       table[kk] = rr
     }
     paper.radiusByK = table
   }
   if (rec['surface'] !== undefined) {
-    if (rec['surface'] !== 'opaque' && rec['surface'] !== 'glass') throw new Error(`${at}.paper.surface: opaque|glass`)
+    if (rec['surface'] !== 'opaque' && rec['surface'] !== 'glass') throw new Error(`${at}.surface: opaque|glass`)
     paper.surface = rec['surface']
   }
   return paper
@@ -146,6 +155,14 @@ function toBigInt(v: unknown, at: string): bigint {
 
 function isPerfectSquare(q: bigint): boolean {
   if (q < 0n) return false
-  const r = BigInt(Math.round(Math.sqrt(Number(q))))
+  if (q < 2n) return true
+  // integer Newton for ⌊√q⌋ — exact at any magnitude (float sqrt is not,
+  // and descriptors admit decimal-string bigints beyond 2⁵³); seed 2^⌈bits/2⌉ ≥ √q
+  let r = 1n << BigInt(Math.ceil(q.toString(2).length / 2))
+  let next = (r + q / r) >> 1n
+  while (next < r) {
+    r = next
+    next = (r + q / r) >> 1n
+  }
   return r * r === q
 }

@@ -10,7 +10,7 @@ import * as THREE from 'three'
 
 import { Complex } from '@/math/core'
 
-import { bakeInstancedMesh } from './bake-instanced'
+import { TraceBaker } from './bake-instanced'
 import { matte } from './materials'
 
 export interface DomainPlaqueOptions {
@@ -29,9 +29,7 @@ export class DomainPlaque extends THREE.Group {
   private plaque: THREE.Mesh
   private spheres: THREE.InstancedMesh
   private readonly dummy = new THREE.Object3D()
-  private traceMesh: THREE.Mesh | null = null
-  private traceDirty = true
-  private displayMode: 'live' | 'trace' = 'live'
+  private readonly baker = new TraceBaker(this, () => this.spheres)
 
   constructor(lattice: [Complex, Complex], points: Complex[], opts: DomainPlaqueOptions = {}) {
     super()
@@ -39,9 +37,14 @@ export class DomainPlaque extends THREE.Group {
     this.points = points
     this.pointRadius = opts.pointRadius ?? 0.02
     this.sizes = opts.sizes ?? null
-    const material = opts.material ?? matte(0xe8ecf2)
-    material.transparent = true
-    material.opacity = 0.75
+    // translucency is applied only to the internally created default — a
+    // caller-supplied material may be shared with other meshes; never mutate it
+    let material = opts.material
+    if (!material) {
+      material = matte(0xe8ecf2)
+      material.transparent = true
+      material.opacity = 0.75
+    }
     this.plaque = new THREE.Mesh(new THREE.BufferGeometry(), material)
     this.spheres = this.buildSpheres(points.length)
     this.add(this.plaque, this.spheres)
@@ -59,8 +62,11 @@ export class DomainPlaque extends THREE.Group {
   setPoints(points: Complex[], colors?: Float32Array, sizes?: number[] | null): void {
     if (points.length !== this.points.length) {
       this.remove(this.spheres)
+      this.spheres.geometry.dispose()
+      ;(this.spheres.material as THREE.Material).dispose()
       this.spheres.dispose()
       this.spheres = this.buildSpheres(points.length)
+      this.spheres.visible = this.baker.mode === 'live'
       this.add(this.spheres)
     }
     this.points = points
@@ -76,7 +82,7 @@ export class DomainPlaque extends THREE.Group {
       this.spheres.setColorAt(i, c)
     }
     if (this.spheres.instanceColor) this.spheres.instanceColor.needsUpdate = true
-    this.invalidateBake()
+    this.baker.invalidate()
   }
 
   setSizes(sizes: number[] | null): void {
@@ -112,33 +118,23 @@ export class DomainPlaque extends THREE.Group {
     }
     this.spheres.instanceMatrix.needsUpdate = true
     this.spheres.computeBoundingSphere()
-    this.invalidateBake()
+    this.baker.invalidate()
   }
 
   /** Trace-mode dual representation (the tracer has no instancing). */
   setMode(mode: 'live' | 'trace'): void {
-    this.displayMode = mode
-    if (mode === 'trace') this.ensureBake()
-    this.spheres.visible = mode === 'live'
-    if (this.traceMesh) this.traceMesh.visible = mode === 'trace'
+    this.baker.setMode(mode)
   }
 
-  private invalidateBake(): void {
-    this.traceDirty = true
-    if (this.displayMode === 'trace') this.ensureBake()
-  }
-
-  private ensureBake(): void {
-    if (!this.traceDirty && this.traceMesh) return
-    if (this.traceMesh) {
-      this.remove(this.traceMesh)
-      this.traceMesh.geometry.dispose()
-      ;(this.traceMesh.material as THREE.Material).dispose()
-    }
-    this.traceMesh = bakeInstancedMesh(this.spheres)
-    this.traceMesh.visible = this.displayMode === 'trace'
-    this.add(this.traceMesh)
-    this.traceDirty = false
+  /** Release every GPU resource this renderable created. */
+  dispose(): void {
+    this.baker.dispose()
+    this.remove(this.plaque, this.spheres)
+    this.plaque.geometry.dispose()
+    ;(this.plaque.material as THREE.Material).dispose()
+    this.spheres.geometry.dispose()
+    ;(this.spheres.material as THREE.Material).dispose()
+    this.spheres.dispose()
   }
 
   private buildSpheres(count: number): THREE.InstancedMesh {

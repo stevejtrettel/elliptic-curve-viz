@@ -80,6 +80,15 @@ the point-export pathway hits it, which this format bypasses entirely.
 ]
 ```
 
-Drop the file in as `data/curves.json` (or send it and Steve will) — every
-curve in it immediately appears in all demos' curve menus and the batch
-renderer, at every feasible field extension.
+## Where the file goes
+
+Each demo owns its collection, so drop the file (or send it and Steve will):
+
+- `demos/torus-lifts/curves.json` — the paper-figure demo: every curve
+  appears in its Curve menu at every feasible field extension, with
+  path-traced finals + reproducibility sidecars from the Studio tab.
+  (Presentation — colors, point radii, profile aesthetics — lives separately
+  in `presentation.json` beside it; new curves render fine without an entry.)
+- `data/curves.json` — the default catalog for the exploratory demos.
+
+Same format in both places; this file's spec is the single contract.

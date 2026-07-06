@@ -223,11 +223,17 @@ export function compileStudio(
     group.add(floor)
   }
 
-  const { environment, background, owned } = compileEnvironment(
-    spec.environment,
-    renderer,
-    onEnvironmentLoaded ?? (() => undefined),
-  )
+  // hdri loads resolve async: if this studio was swapped out (or disposed)
+  // before the load finished, the stale texture must not clobber the current
+  // environment — dispose it on arrival instead of applying it
+  let disposed = false
+  const { environment, background, owned } = compileEnvironment(spec.environment, renderer, (tex) => {
+    if (disposed) {
+      tex.dispose()
+      return
+    }
+    onEnvironmentLoaded?.(tex)
+  })
 
   const handle: StudioHandle = {
     spec,
@@ -236,6 +242,7 @@ export function compileStudio(
     baseIntensities,
     floor,
     dispose() {
+      disposed = true
       group.traverse((obj) => {
         const mesh = obj as THREE.Mesh
         if (mesh.geometry) mesh.geometry.dispose()

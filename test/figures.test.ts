@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildTorusScene, legacyWavy, maxFeasibleK, paperProfile, paperRadius, profileCandidate } from '@/author'
+import { buildTorusScene, maxFeasibleK, paperRadius, profileCandidate } from '@/author'
 import { parseCurveDescriptors, parsePresentation } from '@/io'
+import { tauOf } from '@/math/arithmetic'
+import { paperWavy, solvePaperFamily } from '@/math/families'
 
 // the torus-lifts demo's own files ARE the source of the specified values
 import rawCurves from '../demos/torus-lifts/curves.json'
@@ -34,11 +36,13 @@ describe('torus-lifts specification files', () => {
     expect(paperRadius(bare, 2)).toBe(0.035)
   })
 
-  it("every specified profile builds a torus scene in the curve's-own-lattice mode", () => {
+  it('every specified profile SOLVES from τ and builds a torus scene', () => {
     for (const lc of LIFTS) {
-      const profile = paperProfile(lc)
-      if (!profile) continue
-      const cand = profileCandidate(profile)
+      const prof = lc.paper?.profile
+      if (!prof) continue
+      const sol = solvePaperFamily(tauOf(lc.data.form), prof.n, { a: prof.a })
+      expect(sol, lc.label).not.toBeNull()
+      const cand = profileCandidate(sol!.curve)
       const kTest = Math.min(2, maxFeasibleK(lc.data, 20000))
       const scene = buildTorusScene(lc.data, kTest, cand, { lattice: 'curve' })
       expect(scene.positions.length).toBe(scene.E.size)
@@ -49,9 +53,9 @@ describe('torus-lifts specification files', () => {
   })
 })
 
-describe('legacy profile family', () => {
-  it('legacyWavy samples the exact lifting-modp formulas', () => {
-    const hex = legacyWavy(0.276, 1.9, 3, 512)
+describe('the paper family (historical record)', () => {
+  it('paperWavy samples the exact lifting-modp formulas', () => {
+    const hex = paperWavy(0.276, 1.9, 3, 512) // the historical hand values
     const pts = hex.sample(512)
     expect(pts.length).toBe(512)
     // t=0: φ = π/2 + a·b, θ = 0
@@ -59,12 +63,12 @@ describe('legacy profile family', () => {
     expect(pts[0]!.theta).toBeCloseTo(0, 12)
   })
 
-  it("documents the finding: the paper's hex curve misses exact τ by ~8e-5", () => {
-    // |2n·skew| = 1.656 > 1 (why DiscreteCurve carries it), and strict exact-τ
-    // matching rejects it — the paper's figures live in the curve's own lattice
+  it("documents the finding: the paper's HAND-TUNED hex curve missed exact τ by ~8e-5", () => {
+    // |2n·skew| = 1.656 > 1 (outside WavyCircle's monotone family), and strict
+    // exact-τ matching rejected the hand values — which is why b is now SOLVED
     expect(2 * 3 * 0.276).toBeGreaterThan(1)
     const lc = byLabel('disc −3 · hexagonal')
-    const cand = profileCandidate(legacyWavy(0.276, 1.9, 3))
+    const cand = profileCandidate(paperWavy(0.276, 1.9, 3))
     expect(() => buildTorusScene(lc.data, 1, cand)).toThrow(/lattices do not match/)
   })
 })
