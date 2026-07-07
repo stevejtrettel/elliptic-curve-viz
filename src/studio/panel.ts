@@ -23,7 +23,7 @@ function injectStyles(): void {
   stylesInjected = true
   const style = document.createElement('style')
   style.textContent = `
-    .cp { position:fixed; top:12px; right:12px; width:300px; z-index:1000;
+    .cp { position:fixed; top:12px; right:12px; width:340px; z-index:1000;
       background:rgba(26,26,28,0.92); color:#e0e0e0; border:1px solid #3a3a3d;
       border-radius:10px; font-family:system-ui,sans-serif; font-size:12px;
       backdrop-filter:blur(8px); box-shadow:0 6px 24px rgba(0,0,0,0.4); overflow:hidden; }
@@ -33,8 +33,8 @@ function injectStyles(): void {
     .cp-collapse { color:#888; font-size:11px; }
     .cp.collapsed .cp-body { display:none; }
     .cp.collapsed .cp-header { border-bottom:none; }
-    .cp-tabs { display:flex; gap:2px; padding:6px 6px 0; }
-    .cp-tab { flex:1; padding:6px 4px; text-align:center; cursor:pointer; color:#999;
+    .cp-tabs { display:flex; flex-wrap:wrap; gap:2px; padding:6px 6px 0; }
+    .cp-tab { flex:1 1 auto; min-width:56px; padding:6px 4px; text-align:center; cursor:pointer; color:#999;
       border-radius:6px 6px 0 0; transition:background 0.1s,color 0.1s; white-space:nowrap; }
     .cp-tab:hover { color:#ddd; }
     .cp-tab.active { color:#fff; background:#2c2c30; }
@@ -311,6 +311,8 @@ export class Tab {
 export interface ControlPanelOptions {
   title?: string
   collapsed?: boolean
+  /** Override the default panel width (px) — widen for many-tab panels. */
+  width?: number
 }
 
 export class ControlPanel {
@@ -324,6 +326,7 @@ export class ControlPanel {
     injectStyles()
     this.domElement = document.createElement('div')
     this.domElement.className = 'cp' + (options.collapsed ? ' collapsed' : '')
+    if (options.width) this.domElement.style.width = `${options.width}px`
 
     const header = document.createElement('div')
     header.className = 'cp-header'

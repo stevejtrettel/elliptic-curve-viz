@@ -1,0 +1,130 @@
+{
+  "scene": {
+    "rh": 4.5,
+    "equalize": true,
+    "glassW": 1.15,
+    "glassD": 4,
+    "thick": 0.12,
+    "glassTilt": 0.19,
+    "glassH": 1.2,
+    "glassYaw": -0.27
+  },
+  "units": [
+    {
+      "scale": 1.2,
+      "pointRadius": 0.02,
+      "color": 13908795,
+      "lobes": 6,
+      "skew": 0.05,
+      "k": 2,
+      "colorMode": "degree",
+      "degreeColors": {
+        "2": 16089881
+      },
+      "fibers": 0,
+      "cayley": "off",
+      "cayleyBasis": "reduced",
+      "view": {
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 0,
+        "pole": 0
+      }
+    },
+    {
+      "scale": 1.2,
+      "pointRadius": 0.02,
+      "color": 13908795,
+      "lobes": 3,
+      "skew": 0.3,
+      "k": 2,
+      "colorMode": "degree",
+      "degreeColors": {
+        "1": 1463576,
+        "2": 2792780
+      },
+      "fibers": 0,
+      "cayley": "off",
+      "cayleyBasis": "reduced",
+      "view": {
+        "alpha": 0,
+        "beta": 1.02,
+        "gamma": 3.14,
+        "pole": 0
+      }
+    },
+    {
+      "scale": 1.1,
+      "pointRadius": 0.015,
+      "color": 13908795,
+      "lobes": null,
+      "skew": 0,
+      "k": 2,
+      "colorMode": "degree",
+      "degreeColors": {
+        "1": 5836808,
+        "2": 10954021
+      },
+      "fibers": 0,
+      "cayley": "off",
+      "cayleyBasis": "reduced",
+      "view": {
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 3.14,
+        "pole": 0
+      }
+    },
+    {
+      "scale": 1.1,
+      "pointRadius": 0.015,
+      "color": 13908795,
+      "lobes": null,
+      "skew": 0,
+      "k": 2,
+      "colorMode": "degree",
+      "degreeColors": {
+        "1": 6303625,
+        "2": 8411569
+      },
+      "fibers": 0,
+      "cayley": "off",
+      "cayleyBasis": "reduced",
+      "view": {
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 3.14,
+        "pole": 0
+      }
+    }
+  ],
+  "camera": {
+    "position": [
+      0.5918648884214555,
+      0.40318790467089083,
+      17.7368064137363
+    ],
+    "target": [
+      0,
+      -0.0007900935371121243,
+      0
+    ],
+    "fov": 45
+  },
+  "export": {
+    "aspect": "1:1",
+    "longEdge": 2048
+  },
+  "studio": "colored",
+  "look": {
+    "background": 2642811,
+    "exposure": 1,
+    "envIntensity": 0.95,
+    "floorOffset": 0,
+    "keyLightX": 0,
+    "lights": [
+      5,
+      2
+    ]
+  }
+}

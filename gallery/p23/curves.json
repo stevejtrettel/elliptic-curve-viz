@@ -1,0 +1,4 @@
+[
+  { "label": "disc −91 · form (1,1,23)", "form": { "a": 1, "b": 1, "c": 23 }, "p": 23, "trace": -1, "sign": 1, "equation": { "f": 5, "g": 9 } },
+  { "label": "disc −91 · form (5,3,5)", "form": { "a": 5, "b": 3, "c": 5 }, "p": 23, "trace": -1, "sign": 1, "equation": { "f": 5, "g": 9 } }
+]
