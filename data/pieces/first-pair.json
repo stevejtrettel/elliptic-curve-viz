@@ -1,0 +1,42 @@
+{
+  "tori": [
+    {
+      "curve": "disc −3 · hexagonal",
+      "k": 3,
+      "fibers": 8,
+      "placement": {
+        "position": [
+          -13.051297,
+          0,
+          0
+        ],
+        "quaternion": [
+          0.667302,
+          0,
+          0,
+          0.744787
+        ],
+        "scale": 1
+      }
+    },
+    {
+      "curve": "disc −8 · rectangular (paper example)",
+      "k": 2,
+      "fibers": 6,
+      "placement": {
+        "position": [
+          18.17505,
+          0,
+          0
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": 3.05
+      }
+    }
+  ]
+}

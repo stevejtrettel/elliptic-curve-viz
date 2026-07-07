@@ -7,8 +7,9 @@ import type { Candidate } from '@/math/families'
 
 import { glass, matte } from '@/geometry'
 
-import type { ControlPanel } from '@/studio'
+import type { ControlPanel, DropdownHandle, Tab } from '@/studio'
 
+import { type LabeledCurve, CURVES } from './catalog'
 import type { ColorMode, CurveScene } from './curve-scene'
 
 export interface StandardPanelOptions {
@@ -33,6 +34,25 @@ export function candidateLabel(c: Candidate): string {
   return `${c.stratum} n=${c.n} L=${(c.achieved.L / Math.PI).toFixed(2)}π` + (c.rep.flip ? ' (mirror)' : '')
 }
 
+/**
+ * The standard "Curve" dropdown listing a catalog, wired to `onPick(index)`.
+ * Shared by showCurve's tabs and hand-wired demos so the picker is identical
+ * everywhere; the caller owns what happens on pick (rebuild, reframe, …).
+ */
+export function curveDropdown(
+  tab: Tab,
+  index: number,
+  onPick: (index: number) => void,
+  opts: { curves?: LabeledCurve[]; label?: string } = {},
+): DropdownHandle {
+  const curves = opts.curves ?? CURVES
+  return tab.dropdown(
+    opts.label ?? 'Curve',
+    { options: curves.map((c, i) => ({ label: c.label, value: String(i) })), value: String(index) },
+    (v) => onPick(Number(v)),
+  )
+}
+
 export function addCurveTabs(panel: ControlPanel, scene: CurveScene, opts: StandardPanelOptions): void {
   const curveTab = panel.tab('Curve')
   const pointsTab = panel.tab('Points')
@@ -50,18 +70,16 @@ export function addCurveTabs(panel: ControlPanel, scene: CurveScene, opts: Stand
     },
   )
 
-  curveTab.dropdown(
-    'Curve',
-    {
-      options: scene.catalog.map((c, i) => ({ label: c.label, value: String(i) })),
-      value: String(Math.max(0, scene.catalog.indexOf(scene.curve))),
-    },
-    (v) => {
-      scene.setCurve(Number(v))
+  curveDropdown(
+    curveTab,
+    Math.max(0, scene.catalog.indexOf(scene.curve)),
+    (i) => {
+      scene.setCurve(i)
       candDropdown.setOptions(candidateOptions(), '0')
       kSlider.set(scene.k)
       opts.frame()
     },
+    { curves: scene.catalog },
   )
 
   const kSlider = curveTab.slider('k (field F_{p^k})', { min: 1, max: 6, step: 1, value: scene.k }, (v) => {

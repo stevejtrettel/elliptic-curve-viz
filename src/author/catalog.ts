@@ -35,3 +35,17 @@ export function resolveCurve(ref: number | string | CurveData, curves: LabeledCu
   }
   return hit
 }
+
+/**
+ * The catalog index for a curve reference (undefined → 0), for picking a demo's
+ * initial curve — e.g. `resolveCurveIndex(url.curve ?? 'disc −3 · hexagonal')`.
+ * A reference outside the catalog (raw CurveData) falls back to 0.
+ */
+export function resolveCurveIndex(
+  ref: number | string | CurveData | undefined,
+  curves: LabeledCurve[] = CURVES,
+): number {
+  if (ref === undefined) return 0
+  const i = curves.indexOf(resolveCurve(ref, curves))
+  return i < 0 ? 0 : i
+}

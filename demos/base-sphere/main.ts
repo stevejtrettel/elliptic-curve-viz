@@ -14,7 +14,7 @@
  * fiber circle on the torus. The area cap fills the region C encloses (area A);
  * with C's length L these are the lattice data — ω₂ = A/2 + iL/2, τ = (A + iL)/4π.
  */
-import { CURVES, candidateLabel, decodeParams, resolveCurve } from '@/author'
+import { CURVES, candidateLabel, curveDropdown, decodeParams, resolveCurveIndex } from '@/author'
 import { BaseSphere, HopfTorusMesh, PALETTES, S3Group, TubeSet, colored } from '@/geometry'
 import { tauOf } from '@/math/arithmetic'
 import { type Candidate, solveProfileCurve } from '@/math/families'
@@ -26,7 +26,7 @@ const url = decodeParams(location.search)
 const palette = PALETTES.classic
 
 // ── state (a catalog curve for its τ, an embedding candidate, the knobs) ────
-let curveIndex = Math.max(0, CURVES.indexOf(resolveCurve(url.curve ?? 'disc −3 · hexagonal')))
+let curveIndex = resolveCurveIndex(url.curve ?? 'disc −3 · hexagonal')
 let lobes: number | null = null
 let candidates: Candidate[] = []
 let embedding = 0
@@ -118,19 +118,12 @@ function frame(): void {
 const panel = new ControlPanel({ title: 'base S²' })
 const tab = panel.tab('Base')
 
-tab.dropdown(
-  'Curve',
-  {
-    options: CURVES.map((c, i) => ({ label: c.label, value: String(i) })),
-    value: String(curveIndex),
-  },
-  (v) => {
-    curveIndex = Number(v)
-    solve()
-    embDropdown.setOptions(embeddingOptions(), '0')
-    rebuild()
-  },
-)
+curveDropdown(tab, curveIndex, (i) => {
+  curveIndex = i
+  solve()
+  embDropdown.setOptions(embeddingOptions(), '0')
+  rebuild()
+})
 const embeddingOptions = () =>
   candidates.map((c, i) => ({ value: String(i), label: candidateLabel(c) }))
 const embDropdown = tab.dropdown(
