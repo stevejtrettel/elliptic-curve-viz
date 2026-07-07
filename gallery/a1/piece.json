@@ -1,0 +1,64 @@
+{
+  "camera": {
+    "azimuth": 2.344514,
+    "elevation": 1.562904,
+    "fill": 0.928519
+  },
+  "studio": "colored",
+  "look": {
+    "background": 13673995,
+    "exposure": 1,
+    "envIntensity": 0.95,
+    "floorOffset": 1.2,
+    "lights": [
+      5,
+      2
+    ]
+  },
+  "export": {
+    "aspect": "1:1",
+    "longEdge": 2048
+  },
+  "tori": [
+    {
+      "curve": 0,
+      "k": 6,
+      "lobes": 19,
+      "fibers": 0,
+      "profile": {
+        "a": 0.042,
+        "n": 19
+      },
+      "colorBy": "degree",
+      "pointRadius": 0.025,
+      "torus": "matte",
+      "surfaceColor": 13232895,
+      "degreeColors": {
+        "1": 9517942,
+        "2": 5386605,
+        "3": 4281503,
+        "6": 4431318
+      },
+      "view": {
+        "alpha": 3.52,
+        "beta": 0,
+        "gamma": 0,
+        "pole": 0
+      },
+      "placement": {
+        "position": [
+          0,
+          0,
+          0
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": 1.25
+      }
+    }
+  ]
+}

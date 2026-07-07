@@ -14,6 +14,13 @@ describe('arrange', () => {
     expect(g.every((s) => s.scale.x === 1)).toBe(true)
   })
 
+  it('column stacks along z in the ground plane, entry 0 at −z (top of frame)', () => {
+    const g = groups(2)
+    arrange(g, [1, 1], { type: 'column', spacing: 0, equalize: false })
+    expect(g.every((s) => s.position.x === 0 && s.position.y === 0)).toBe(true)
+    expect(g[0]!.position.z).toBeLessThan(g[1]!.position.z) // entry 0 toward −z
+  })
+
   it('equalize scales each torus to the median radius (outliers shrink)', () => {
     const g = groups(4)
     // median of [1,2,3,100] = 2.5; the giant shrinks, the small ones grow

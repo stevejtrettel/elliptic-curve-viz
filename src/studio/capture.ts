@@ -23,7 +23,14 @@ export async function saveScreenshot(app: App, filename = 'screenshot.png'): Pro
 /** Path-trace to the sample budget, then download PNG (+ sidecar JSON beside it). */
 export async function saveRenderFinal(
   app: App,
-  opts: { samples?: number; scale?: number; sidecar?: Record<string, unknown>; name?: string } = {},
+  opts: {
+    samples?: number
+    scale?: number
+    width?: number
+    height?: number
+    sidecar?: Record<string, unknown>
+    name?: string
+  } = {},
 ): Promise<void> {
   const name = opts.name ?? 'render'
   const result = await app.renderFinal(opts)

@@ -3,7 +3,7 @@
   { "label": "disc −3 · hexagonal", "p": 7, "trace": 5, "sign": 1, "form": { "a": 1, "b": 1, "c": 1 } },
   { "label": "disc −4 · square", "p": 5, "trace": 4, "sign": 1, "form": { "a": 1, "b": 0, "c": 1 } },
   { "label": "disc −7", "p": 11, "trace": 4, "sign": 1, "form": { "a": 1, "b": 1, "c": 2 } },
-  { "label": "disc −11", "p": 5, "trace": 3, "sign": 1, "form": { "a": 1, "b": 1, "c": 3 } },
+  { "label": "disc −11", "p": 5, "trace": 3, "sign": 1, "form": { "a": 1, "b": 1, "c": 3 }, "equation": { "f": 4, "g": 3 } },
   { "label": "disc −20 · form (1,0,5)", "p": 41, "trace": 12, "sign": 1, "form": { "a": 1, "b": 0, "c": 5 } },
   { "label": "disc −20 · form (2,2,3)", "p": 41, "trace": 12, "sign": 1, "form": { "a": 2, "b": 2, "c": 3 } },
   { "label": "disc −28 = −7·2²", "p": 11, "trace": 4, "sign": 1, "form": { "a": 1, "b": 0, "c": 7 } },

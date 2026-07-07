@@ -1,4 +1,5 @@
 export * from './catalog'
+export * from './finite-view'
 export * from './torus-scene'
 export * from './grid-curves'
 export * from './curve-scene'

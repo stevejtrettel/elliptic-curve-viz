@@ -15,7 +15,10 @@ export const bridgesPaper: StudioSpec = {
     bottom: 0x666666,
     exponent: 2,
     intensity: 1,
-    background: 'same',
+    // gradient lights the scene (white→grey), but the BACKDROP is a flat
+    // off-white — else the top-down camera stares straight at the grey nadir
+    // (and the path tracer shows it, since the floor doesn't fill the frame)
+    background: 0xf2f2ef,
   },
   lights: [
     {

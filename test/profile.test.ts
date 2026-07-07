@@ -9,11 +9,12 @@ describe('profile curve validation', () => {
     expect(new LatitudeCircle(1).sample(8)).toHaveLength(8)
   })
 
-  it('WavyCircle enforces φ₀ ± b ∈ (0, π) and |2n·skew| < 1', () => {
+  it('WavyCircle enforces φ₀ ± b ∈ (0, π) but allows looped θ (large skew)', () => {
     expect(() => new WavyCircle({ phi0: Math.PI / 2, b: Math.PI / 2, n: 3 })).toThrow(RangeError)
     expect(() => new WavyCircle({ phi0: 0.2, b: 0.3, n: 2 })).toThrow(RangeError)
-    expect(() => new WavyCircle({ phi0: Math.PI / 2, b: 0.5, n: 3, skew: 0.2 })).toThrow(RangeError)
     expect(() => new WavyCircle({ phi0: Math.PI / 2, b: 0.5, n: 1.5 })).toThrow(RangeError)
+    // no monotonicity guard: the paper's look sits at 2n·skew = 1.6 (θ loops)
+    expect(new WavyCircle({ phi0: Math.PI / 2, b: 0.5, n: 3, skew: 0.8 / 3 }).sample(16)).toHaveLength(16)
     expect(new WavyCircle({ phi0: Math.PI / 2, b: 0.5, n: 3, skew: 0.1 }).sample(16)).toHaveLength(16)
   })
 

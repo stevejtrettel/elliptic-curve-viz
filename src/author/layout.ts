@@ -11,7 +11,7 @@
  */
 import * as THREE from 'three'
 
-export type LayoutType = 'row' | 'grid' | 'ring'
+export type LayoutType = 'row' | 'column' | 'grid' | 'ring'
 
 export interface LayoutParams {
   type: LayoutType
@@ -36,21 +36,45 @@ export function arrange(slots: THREE.Group[], radii: number[], params: LayoutPar
   // instead of the whole scene ballooning up to the largest torus.
   const target = median(radii)
   const eff = radii.map((r) => (params.equalize ? target : r))
+  place(slots, eff, params)
+  // the coarse pass owns scale + upright orientation
+  slots.forEach((slot, i) => {
+    slot.quaternion.identity()
+    slot.scale.setScalar(params.equalize ? target / radii[i]! : 1)
+  })
+}
+
+/**
+ * Re-space the tori along the current template WITHOUT touching their scale or
+ * rotation — the Spacing slider's job. Effective footprint is each torus's
+ * intrinsic radius times its LIVE scale, so hand-scaled tori space correctly and
+ * keep the size you gave them.
+ */
+export function reflow(slots: THREE.Group[], radii: number[], params: Omit<LayoutParams, 'equalize'>): void {
+  if (slots.length === 0) return
+  const eff = radii.map((r, i) => r * slots[i]!.scale.x)
+  place(slots, eff, params)
+}
+
+/** Position-only core shared by arrange (coarse) and reflow (spacing). */
+function place(slots: THREE.Group[], eff: number[], params: Omit<LayoutParams, 'equalize'>): void {
+  const n = slots.length
   const mean = eff.reduce((a, b) => a + b, 0) / n
   const gap = Math.max(params.spacing, 0) * mean
 
-  const setScale = (slot: THREE.Group, i: number) =>
-    slot.scale.setScalar(params.equalize ? target / radii[i]! : 1)
-
-  if (params.type === 'row') {
+  if (params.type === 'row' || params.type === 'column') {
+    // both run IN the ground plane (the overhead camera looks straight down at
+    // it): row along x reads left→right, column along z reads top→bottom, entry
+    // 0 at −z (the top of the frame). Stacking along y would hide tori behind
+    // each other under the top-down camera.
+    const vertical = params.type === 'column'
     const total = eff.reduce((a, b) => a + 2 * b, 0) + gap * (n - 1)
-    let x = -total / 2
+    let t = -total / 2
     slots.forEach((slot, i) => {
-      x += eff[i]!
-      slot.position.set(x, 0, 0)
-      slot.quaternion.identity()
-      setScale(slot, i)
-      x += eff[i]! + gap
+      t += eff[i]!
+      if (vertical) slot.position.set(0, 0, t)
+      else slot.position.set(t, 0, 0)
+      t += eff[i]! + gap
     })
   } else if (params.type === 'grid') {
     const cols = params.columns ?? Math.ceil(Math.sqrt(n))
@@ -60,8 +84,6 @@ export function arrange(slots: THREE.Group[], radii: number[], params: LayoutPar
       const col = i % cols
       const row = Math.floor(i / cols)
       slot.position.set((col - (cols - 1) / 2) * cell, 0, (row - (rows - 1) / 2) * cell)
-      slot.quaternion.identity()
-      setScale(slot, i)
     })
   } else {
     // ring: radius so the circumference fits every torus plus its gaps
@@ -70,8 +92,6 @@ export function arrange(slots: THREE.Group[], radii: number[], params: LayoutPar
     slots.forEach((slot, i) => {
       const a = (2 * Math.PI * i) / n
       slot.position.set(R * Math.cos(a), 0, R * Math.sin(a))
-      slot.quaternion.identity()
-      setScale(slot, i)
     })
   }
 }

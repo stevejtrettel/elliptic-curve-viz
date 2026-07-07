@@ -11,10 +11,13 @@ const name = new URLSearchParams(location.search).get('piece') ?? 'first-pair'
 const raw = files[`../../data/pieces/${name}.json`]
 
 if (raw) {
-  const demo = showPiece({ piece: parsePieceFile(raw), name })
-  // ?select=<i> deep-links a torus already selected (gizmo attached)
-  const sel = new URLSearchParams(location.search).get('select')
+  const demo = showPiece({ piece: parsePieceFile(raw), name, saveMode: 'sandbox' })
+  // ?select=<i> deep-links a torus already selected; ?mode=rotate|translate
+  const params = new URLSearchParams(location.search)
+  const sel = params.get('select')
   if (sel !== null && /^\d+$/.test(sel)) demo.placement.select(Number(sel))
+  const mode = params.get('mode')
+  if (mode === 'rotate' || mode === 'translate') demo.placement.setMode(mode)
 } else {
   const stems = Object.keys(files).map((k) => k.split('/').pop()!.replace('.json', ''))
   const p = document.createElement('p')

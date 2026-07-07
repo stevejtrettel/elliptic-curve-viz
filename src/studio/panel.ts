@@ -23,7 +23,7 @@ function injectStyles(): void {
   stylesInjected = true
   const style = document.createElement('style')
   style.textContent = `
-    .cp { position:fixed; top:12px; right:12px; width:248px; z-index:1000;
+    .cp { position:fixed; top:12px; right:12px; width:300px; z-index:1000;
       background:rgba(26,26,28,0.92); color:#e0e0e0; border:1px solid #3a3a3d;
       border-radius:10px; font-family:system-ui,sans-serif; font-size:12px;
       backdrop-filter:blur(8px); box-shadow:0 6px 24px rgba(0,0,0,0.4); overflow:hidden; }
@@ -58,6 +58,14 @@ function injectStyles(): void {
       border-radius:50%; background:#ddd; transition:transform 0.15s; }
     .cp-toggle.on .cp-switch { background:#6aa0ff; }
     .cp-toggle.on .cp-switch::after { transform:translateX(16px); }
+    .cp-section { display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none;
+      font-size:10px; font-weight:600; letter-spacing:0.08em; text-transform:uppercase; color:#7d7d86;
+      border-top:1px solid #303033; padding-top:8px; }
+    .cp-section:first-child { border-top:none; padding-top:0; }
+    .cp-section:hover { color:#aaa; }
+    .cp-caret { font-size:8px; color:#6a6a72; width:8px; }
+    .cp-section-body { display:flex; flex-direction:column; gap:9px; }
+    .cp-section-body.folded { display:none; }
   `
   document.head.appendChild(style)
 }
@@ -101,6 +109,8 @@ export interface ButtonHandle {
 export interface ColorHandle {
   value: string
   set(hex: string): void
+  setLabel(text: string): void
+  readonly row: HTMLElement
 }
 export interface LabelHandle {
   set(text: string): void
@@ -109,9 +119,12 @@ export interface LabelHandle {
 /** A single tab page; controls are appended here. */
 export class Tab {
   readonly page: HTMLDivElement
+  /** Where controls land: the page, or the open section body after section(). */
+  private current: HTMLElement
 
   constructor(page: HTMLDivElement) {
     this.page = page
+    this.current = page
   }
 
   slider(label: string, spec: SliderSpec, onChange: (v: number) => void): SliderHandle {
@@ -135,7 +148,7 @@ export class Tab {
       onChange(v)
     })
     row.append(lab, input, val)
-    this.page.appendChild(row)
+    this.current.appendChild(row)
     return {
       get value() {
         return Number(input.value)
@@ -167,7 +180,7 @@ export class Tab {
     select.value = spec.value
     select.addEventListener('change', () => onChange(select.value))
     row.append(lab, select)
-    this.page.appendChild(row)
+    this.current.appendChild(row)
     return {
       get value() {
         return select.value
@@ -192,7 +205,7 @@ export class Tab {
     input.value = value
     input.addEventListener('input', () => onChange(input.value))
     row.append(lab, input)
-    this.page.appendChild(row)
+    this.current.appendChild(row)
     return {
       get value() {
         return input.value
@@ -200,6 +213,10 @@ export class Tab {
       set(v: string) {
         input.value = v
       },
+      setLabel(text: string) {
+        lab.textContent = text
+      },
+      row,
     }
   }
 
@@ -217,7 +234,7 @@ export class Tab {
       row.classList.toggle('on', state)
       onChange(state)
     })
-    this.page.appendChild(row)
+    this.current.appendChild(row)
     return {
       get value() {
         return state
@@ -243,7 +260,7 @@ export class Tab {
     val.style.flex = '1'
     val.textContent = initial
     row.append(lab, val)
-    this.page.appendChild(row)
+    this.current.appendChild(row)
     return {
       set(text: string) {
         val.textContent = text
@@ -251,12 +268,37 @@ export class Tab {
     }
   }
 
+  /**
+   * A collapsible section header — the controls that follow land in its body
+   * (until the next section()). Open by default; click the header to fold it.
+   */
+  section(title: string): void {
+    const header = document.createElement('div')
+    header.className = 'cp-section'
+    const caret = document.createElement('span')
+    caret.className = 'cp-caret'
+    caret.textContent = '▾'
+    const label = document.createElement('span')
+    label.textContent = title
+    header.append(caret, label)
+    const body = document.createElement('div')
+    body.className = 'cp-section-body'
+    header.addEventListener('click', () => {
+      const folded = body.classList.toggle('folded')
+      caret.textContent = folded ? '▸' : '▾'
+    })
+    // sections are always top-level siblings on the page, not nested in each other
+    this.page.appendChild(header)
+    this.page.appendChild(body)
+    this.current = body
+  }
+
   button(label: string, onClick: () => void): ButtonHandle {
     const btn = document.createElement('button')
     btn.className = 'cp-btn'
     btn.textContent = label
     btn.addEventListener('click', onClick)
-    this.page.appendChild(btn)
+    this.current.appendChild(btn)
     return {
       setLabel(l: string) {
         btn.textContent = l

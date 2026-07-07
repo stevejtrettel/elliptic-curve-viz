@@ -44,6 +44,8 @@ export interface CurveDemoSpec {
   curves?: LabeledCurve[]
   k?: number
   lobes?: number | null
+  /** θ-skew, the paper's twist: θ = t + skew·sin(2n·t). Default 0 = untwisted. */
+  skew?: number
   /** Which solver candidate (index into the sorted list; default 0 = fattest). */
   embedding?: number
   /** Explicit profile curve (paper reproduction) — replaces the solver's candidates. */
@@ -107,6 +109,7 @@ export function showCurve(spec: CurveDemoSpec = {}): CurveDemo {
     curve: url.curve ?? spec.curve ?? 0,
     k: url.k ?? spec.k ?? 2,
     lobes: url.lobes ?? spec.lobes ?? null,
+    skew: spec.skew ?? 0,
     embedding: spec.embedding ?? 0,
     fibers: url.fibers ?? spec.fibers ?? 0,
     gridlines: url.grid ?? spec.gridlines ?? 0,

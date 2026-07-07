@@ -56,7 +56,9 @@ export interface WavyCircleParams {
 
 /**
  * The default family (DESIGN.md §5.4): φ(t) = φ₀ + b·cos(nt),
- * θ(t) = t + skew·sin(2nt). θ monotone ⟹ graph over the equator ⟹ simple.
+ * θ(t) = t + skew·sin(2nt). |2n·skew| < 1 keeps θ monotone (simple graph over
+ * the equator); larger skew — the paper's look sits at 2n·skew = 1.6 — lets θ
+ * backtrack into loops, which is allowed.
  */
 export class WavyCircle implements ProfileCurve {
   readonly phi0: number
@@ -69,7 +71,6 @@ export class WavyCircle implements ProfileCurve {
     if (!(phi0 - Math.abs(b) > 0 && phi0 + Math.abs(b) < Math.PI)) {
       throw new RangeError(`φ₀ ± b must stay in (0, π): φ₀ = ${phi0}, b = ${b}`)
     }
-    if (!(Math.abs(2 * n * skew) < 1)) throw new RangeError(`|2n·skew| < 1 required for monotone θ, got ${2 * n * skew}`)
     this.phi0 = phi0
     this.b = b
     this.n = n

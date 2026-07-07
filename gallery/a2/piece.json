@@ -1,0 +1,95 @@
+{
+  "camera": {
+    "azimuth": 3.122248,
+    "elevation": 1.566742,
+    "fill": 0.913855
+  },
+  "studio": "colored",
+  "look": {
+    "surface": "matte",
+    "surfaceColor": 13232895,
+    "background": 3819169,
+    "exposure": 1,
+    "envIntensity": 0.95,
+    "floorOffset": 5.7,
+    "keyLightX": 9,
+    "lights": [
+      5,
+      2
+    ]
+  },
+  "export": {
+    "aspect": "2:3",
+    "longEdge": 4096
+  },
+  "tori": [
+    {
+      "curve": 0,
+      "k": 4,
+      "lobes": null,
+      "fibers": 0,
+      "skew": 0.2,
+      "colorBy": "degree",
+      "pointRadius": 0.06,
+      "degreeColors": {
+        "1": 1261105,
+        "2": 1657097,
+        "4": 3706899
+      },
+      "view": {
+        "alpha": 2.07,
+        "beta": 0,
+        "gamma": 0,
+        "pole": 0
+      },
+      "placement": {
+        "position": [
+          0,
+          0,
+          6.201873
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": 1.382043
+      }
+    },
+    {
+      "curve": 1,
+      "k": 4,
+      "lobes": null,
+      "fibers": 0,
+      "skew": 0.05,
+      "colorBy": "degree",
+      "pointRadius": 0.045,
+      "degreeColors": {
+        "1": 1261105,
+        "2": 1657097,
+        "4": 3706899
+      },
+      "view": {
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 3.14,
+        "pole": 0
+      },
+      "placement": {
+        "position": [
+          0,
+          0,
+          -6.201873
+        ],
+        "quaternion": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "scale": 2.25
+      }
+    }
+  ]
+}

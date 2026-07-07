@@ -12,8 +12,7 @@
  *   • Depth isn't a guess — translate is constrained to the ground (XZ) plane by
  *     default, so dragging slides a torus across the floor like an object on a
  *     table. Vertical lift is an explicit opt-in.
- *   • Rotate defaults to spin-in-place about vertical (the common move); full
- *     tumble is opt-in.
+ *   • Rotate is full 3-axis (all rings), so a donut can be turned any way.
  *
  * OrbitControls is suspended while the gizmo drags (dragging-changed) so a
  * placement drag never doubles as a camera move; a press that travels more than
@@ -45,8 +44,6 @@ export interface PlacementHandle {
   setMode(mode: PlaceMode): void
   /** Allow vertical (Y) translation in Move mode (default off = ground plane). */
   setVertical(on: boolean): void
-  /** Allow full tumble in Rotate mode (default off = spin about vertical). */
-  setTumble(on: boolean): void
   dispose(): void
 }
 
@@ -67,7 +64,6 @@ export function enablePlacement(app: App, slots: THREE.Group[], opts: Placement3
 
   let index: number | null = null
   let vertical = false
-  let tumble = false
 
   // constrain the gizmo handles to the current mode's intent
   const applyAxes = () => {
@@ -76,9 +72,7 @@ export function enablePlacement(app: App, slots: THREE.Group[], opts: Placement3
       control.showY = vertical // off → drag on the ground plane, no depth guessing
       control.showZ = true
     } else {
-      control.showX = tumble
-      control.showY = true // on → spin in place about vertical
-      control.showZ = tumble
+      control.showX = control.showY = control.showZ = true // full 3-axis rotation
     }
   }
 
@@ -152,10 +146,6 @@ export function enablePlacement(app: App, slots: THREE.Group[], opts: Placement3
     setMode,
     setVertical: (on) => {
       vertical = on
-      applyAxes()
-    },
-    setTumble: (on) => {
-      tumble = on
       applyAxes()
     },
     dispose() {

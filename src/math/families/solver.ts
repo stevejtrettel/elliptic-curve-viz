@@ -41,7 +41,11 @@ export interface Candidate {
 export interface SolveOptions {
   /** Pin the lobe count (artistic override). */
   n?: number
-  /** θ skew, artistic, default 0. Must satisfy |2n·skew| < 1 for every n tried. */
+  /**
+   * θ skew, artistic, default 0. |2n·skew| < 1 keeps θ monotone; larger values
+   * (the paper's look is 2n·skew = 1.6) let θ backtrack into loops. No ceiling:
+   * whatever you pass is used; an (n, skew) the solve can't realize returns [].
+   */
   skew?: number
   /** How many candidates to return (default 6). */
   maxCandidates?: number
@@ -282,7 +286,6 @@ function solveStrata(
   }
   const ns = pinnedN !== undefined ? [pinnedN] : Array.from({ length: nMax }, (_, i) => i + 1)
   for (const n of ns) {
-    if (Math.abs(2 * n * skew) >= 1) continue // skew invalid at this lobe count
     if (onWall) {
       const curve = solveWall(targetL, n, skew, samples)
       if (curve) return { curve, n, stratum: 'wall' }

@@ -37,6 +37,45 @@ export function colorByDegree(E: CurvePoints, palette = DEFAULT): Float32Array {
   return colors
 }
 
+/** Sorted distinct degrees (subfields of definition) present in E. */
+export function degreesOf(E: CurvePoints): number[] {
+  return [...new Set(E.points().map((P) => E.degree(P)))].sort((a, b) => a - b)
+}
+
+/**
+ * Default warm ramp over the subfield layers: the full field (highest degree,
+ * the "main" points) is yellow, smaller subfields fade orange → red. Returns a
+ * degree ↦ hex map so the panel can seed its per-subfield color pickers.
+ */
+export function degreeRamp(degrees: number[]): Map<number, number> {
+  const sorted = [...degrees].sort((a, b) => a - b)
+  const lo = new THREE.Color(0xc0301f) // red — smallest field
+  const hi = new THREE.Color(0xf5c518) // yellow — full field / main points
+  const out = new Map<number, number>()
+  sorted.forEach((d, i) => {
+    const t = sorted.length <= 1 ? 1 : i / (sorted.length - 1)
+    out.set(d, lo.clone().lerp(hi, t).getHex())
+  })
+  return out
+}
+
+/** Color by subfield with an explicit degree ↦ hex lookup (per-layer pickers). */
+export function colorByDegreeMap(E: CurvePoints, hexFor: (degree: number) => number): Float32Array {
+  const pts = E.points()
+  const colors = new Float32Array(3 * pts.length)
+  const cache = new Map<number, THREE.Color>()
+  pts.forEach((P, i) => {
+    const d = E.degree(P)
+    let c = cache.get(d)
+    if (!c) {
+      c = new THREE.Color(hexFor(d))
+      cache.set(d, c)
+    }
+    fill(colors, i, c)
+  })
+  return colors
+}
+
 /** Color by group-theoretic order (each distinct order gets a palette slot). */
 export function colorByOrder(E: CurvePoints, palette = DEFAULT): Float32Array {
   const pts = E.points()

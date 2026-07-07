@@ -31,6 +31,35 @@ describe('parsePieceFile', () => {
     expect(piece.tori[0]!.placement!.scale).toBeUndefined()
   })
 
+  it('parses lobes (number or null), pointRadius, and a layout block', () => {
+    const piece = parsePieceFile({
+      layout: { type: 'ring', spacing: 0.5, equalize: true },
+      tori: [
+        { curve: 0, lobes: 3, pointRadius: 0.04 },
+        { curve: 1, lobes: null },
+      ],
+    })
+    expect(piece.layout).toEqual({ type: 'ring', spacing: 0.5, equalize: true })
+    expect(piece.tori[0]!.lobes).toBe(3)
+    expect(piece.tori[0]!.pointRadius).toBe(0.04)
+    expect(piece.tori[1]!.lobes).toBeNull()
+  })
+
+  it('parses surfaceColor and cayleyBasis', () => {
+    const piece = parsePieceFile({
+      tori: [{ curve: 0, surfaceColor: 8905983, cayley: [0, 1], cayleyBasis: 'structure' }],
+    })
+    expect(piece.tori[0]!.surfaceColor).toBe(8905983)
+    expect(piece.tori[0]!.cayleyBasis).toBe('structure')
+    expect(() => parsePieceFile({ tori: [{ curve: 0, cayleyBasis: 'nope' }] })).toThrow(/cayleyBasis/)
+  })
+
+  it('rejects a bad layout block', () => {
+    expect(() => parsePieceFile({ layout: { type: 'spiral', spacing: 1, equalize: false }, tori: [{ curve: 0 }] })).toThrow(
+      /layout\.type/,
+    )
+  })
+
   it('validates and resolves an inline curve to bigint CurveData', () => {
     const piece = parsePieceFile({ tori: [{ curve: INLINE, k: 2 }] })
     const curve = piece.tori[0]!.curve as CurveData
@@ -72,5 +101,26 @@ describe('serializePiece', () => {
     const reparsed = parsePieceFile(json)
     expect((reparsed.tori[0]!.curve as CurveData).p).toBe(7n)
     expect(reparsed.tori[0]!.placement!.scale).toBe(0.5)
+  })
+
+  it('round-trips a saved camera', () => {
+    const piece = parsePieceFile({
+      camera: { azimuth: 0.5, elevation: 1.2, fill: 0.8 },
+      tori: [{ curve: 0 }],
+    })
+    expect(piece.camera).toEqual({ azimuth: 0.5, elevation: 1.2, fill: 0.8 })
+    const json = serializePiece(piece, [{ position: [0, 0, 0], quaternion: [0, 0, 0, 1], scale: 1 }]) as {
+      camera: unknown
+    }
+    expect(json.camera).toEqual({ azimuth: 0.5, elevation: 1.2, fill: 0.8 })
+    expect(parsePieceFile(json).camera).toEqual({ azimuth: 0.5, elevation: 1.2, fill: 0.8 })
+  })
+
+  it('emits the layout block when present', () => {
+    const piece = parsePieceFile({ layout: { type: 'grid', spacing: 0.3, equalize: false }, tori: [{ curve: 0 }] })
+    const json = serializePiece(piece, [{ position: [0, 0, 0], quaternion: [0, 0, 0, 1], scale: 1 }]) as {
+      layout: unknown
+    }
+    expect(json.layout).toEqual({ type: 'grid', spacing: 0.3, equalize: false })
   })
 })

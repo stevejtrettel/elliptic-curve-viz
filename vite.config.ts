@@ -1,5 +1,5 @@
 import { defineConfig, type Plugin } from 'vite'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -28,14 +28,17 @@ function demoEntry(): Plugin {
 }
 
 /**
- * Save round-trip for the `pieces` demo: POST /api/save-piece?name=<stem>
- * writes the request body to data/pieces/<stem>.json. DEV ONLY (configureServer
- * runs only under `vite` serve) — the production build ships no such route, so a
- * hosted gallery is read-only. `name` is whitelisted to a bare file stem so the
- * write can never escape data/pieces/.
+ * Save round-trip. POST /api/save-piece writes the request body to disk:
+ *   ?demo=<name>  → gallery/<name>/piece.json or demos/<name>/piece.json
+ *   ?name=<stem>  → data/pieces/<stem>.json   (the sandbox demo)
+ * DEV ONLY (configureServer runs only under `vite` serve) — the production build
+ * ships no such route, so a hosted gallery is read-only. Both params are
+ * whitelisted to a bare stem, so the write can never escape its directory; a
+ * ?demo target must be an existing piece folder (gallery/ preferred, then demos/).
  */
 function savePiece(): Plugin {
-  const dir = fileURLToPath(new URL('./data/pieces', import.meta.url))
+  const root = fileURLToPath(new URL('.', import.meta.url))
+  const isStem = (s: string) => /^[a-z0-9._-]+$/i.test(s)
   return {
     name: 'save-piece',
     configureServer(server) {
@@ -44,18 +47,27 @@ function savePiece(): Plugin {
           res.statusCode = 405
           return res.end('POST only')
         }
-        const name = new URL(req.url ?? '', 'http://localhost').searchParams.get('name') ?? ''
-        if (!/^[a-z0-9._-]+$/i.test(name)) {
+        const q = new URL(req.url ?? '', 'http://localhost').searchParams
+        const demo = q.get('demo')
+        const name = q.get('name')
+        let target: string | null = null
+        if (demo && isStem(demo)) {
+          const dir = ['gallery', 'demos'].find((d) => existsSync(path.join(root, d, demo)))
+          if (dir) target = path.join(root, dir, demo, 'piece.json')
+        } else if (name && isStem(name)) {
+          target = path.join(root, 'data', 'pieces', `${name}.json`)
+        }
+        if (!target) {
           res.statusCode = 400
-          return res.end('bad piece name')
+          return res.end('bad or unknown save target')
         }
         let body = ''
         req.on('data', (chunk) => (body += chunk))
         req.on('end', () => {
           try {
             const json = JSON.stringify(JSON.parse(body), null, 2) + '\n' // reject non-JSON bodies
-            mkdirSync(dir, { recursive: true })
-            writeFileSync(path.join(dir, `${name}.json`), json)
+            mkdirSync(path.dirname(target!), { recursive: true })
+            writeFileSync(target!, json)
             res.statusCode = 200
             res.end('ok')
           } catch (err) {

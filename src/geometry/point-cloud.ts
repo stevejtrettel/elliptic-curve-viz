@@ -37,6 +37,9 @@ export class PointCloud extends THREE.Group implements S3Renderable {
   private baseRadius: number
   private sizes: number[] | null
   private lastProjection: S3Projection | null = null
+  private lastColors: Float32Array | null = null
+  /** Sphere tessellation (width, height segments) — raised by the high-res toggle. */
+  private sphereSegs: [number, number] = [16, 12]
   private readonly dummy = new THREE.Object3D()
   private readonly baker = new TraceBaker(this, () => this.mesh)
 
@@ -65,6 +68,7 @@ export class PointCloud extends THREE.Group implements S3Renderable {
 
   /** CHEAP — per-instance colors, parallel to the current points. */
   setColors(colors: Float32Array): void {
+    this.lastColors = colors
     const c = new THREE.Color()
     for (let i = 0; i < this.pointCount; i++) {
       c.setRGB(colors[3 * i]!, colors[3 * i + 1]!, colors[3 * i + 2]!)
@@ -145,8 +149,31 @@ export class PointCloud extends THREE.Group implements S3Renderable {
     this.mesh.dispose()
   }
 
+  /**
+   * EXPENSIVE — rebuild the instanced spheres at a new tessellation (the high-res
+   * toggle: smoother balls before a path trace). Re-applies colors + projection.
+   */
+  setSphereResolution(width: number, height: number): void {
+    if (width === this.sphereSegs[0] && height === this.sphereSegs[1]) return
+    this.sphereSegs = [width, height]
+    const material = this.mesh.material as THREE.Material
+    this.remove(this.mesh)
+    this.mesh.geometry.dispose()
+    this.mesh.dispose()
+    this.mesh = this.buildMesh(material)
+    this.mesh.visible = this.baker.mode === 'live'
+    this.add(this.mesh)
+    if (this.lastColors) this.setColors(this.lastColors)
+    if (this.lastProjection) this.reproject(this.lastProjection)
+    this.baker.invalidate()
+  }
+
   private buildMesh(material?: THREE.Material): THREE.InstancedMesh {
-    const mesh = new THREE.InstancedMesh(new THREE.SphereGeometry(1, 16, 12), material ?? colored(), this.pointCount)
+    const mesh = new THREE.InstancedMesh(
+      new THREE.SphereGeometry(1, this.sphereSegs[0], this.sphereSegs[1]),
+      material ?? colored(),
+      this.pointCount,
+    )
     const white = new THREE.Color(1, 1, 1)
     for (let i = 0; i < this.pointCount; i++) mesh.setColorAt(i, white)
     if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true

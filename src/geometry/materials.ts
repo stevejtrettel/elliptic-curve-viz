@@ -32,6 +32,33 @@ export function matte(color: THREE.ColorRepresentation = 0xf0f0f0): THREE.MeshPh
   return new THREE.MeshPhysicalMaterial({ color, roughness: 0.9, metalness: 0, side: THREE.DoubleSide })
 }
 
+export interface PaperOptions {
+  /** Grain normal map (from textures.loadNormalMap); null = plain matte paper. */
+  normalMap?: THREE.Texture | null
+  /** Grain strength (default 0.6). */
+  normalScale?: number
+  /** Optional base-color texture — the grid map (Phase 2). */
+  map?: THREE.Texture | null
+}
+
+/**
+ * Matte paper surface: like `matte` but carrying a tileable grain normal map (and,
+ * later, a grid `map`). DoubleSide, path-tracer compatible. UVs come from
+ * HopfTorusMesh's lattice UV attribute, so maps tile as the fundamental domain.
+ */
+export function paper(color: THREE.ColorRepresentation = 0xf0ece0, opts: PaperOptions = {}): THREE.MeshPhysicalMaterial {
+  const scale = opts.normalScale ?? 0.6
+  return new THREE.MeshPhysicalMaterial({
+    color,
+    roughness: 0.95,
+    metalness: 0,
+    side: THREE.DoubleSide,
+    normalMap: opts.normalMap ?? null,
+    normalScale: new THREE.Vector2(scale, scale),
+    map: opts.map ?? null,
+  })
+}
+
 /** Colored solid, the point-sphere default (per-instance colors multiply white). */
 export function colored(color: THREE.ColorRepresentation = 0xffffff): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({ color, roughness: 0.5, metalness: 0 })

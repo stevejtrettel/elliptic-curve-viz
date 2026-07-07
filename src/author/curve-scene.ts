@@ -21,7 +21,7 @@ import type { CurveData, TorusPoint } from '@/math/arithmetic'
 import { tauOf } from '@/math/arithmetic'
 import { Quaternion, Vec4 } from '@/math/core'
 import type { Candidate } from '@/math/families'
-import { solveProfileCurve } from '@/math/families'
+import { paperLobes, solvePaperFamily, solveProfileCurve } from '@/math/families'
 import { type ProfileCurve, S3Projection, sphereToR3 } from '@/math/hopf'
 
 import {
@@ -32,10 +32,12 @@ import {
   S3Group,
   TubeSet,
   colorByCoset,
-  colorByDegree,
+  colorByDegreeMap,
   colorByOrbit,
   colorByOrder,
   colored,
+  degreeRamp,
+  degreesOf,
   highlightOrbit,
   sizeByDegree,
   uniformColors,
@@ -86,6 +88,8 @@ export interface CurveSceneOptions {
   curves?: LabeledCurve[]
   k?: number
   lobes?: number | null
+  /** θ-skew (the paper's twist): θ = t + skew·sin(2n·t). 0 = untwisted. */
+  skew?: number
   embedding?: number
   fibers?: number
   gridlines?: number
@@ -99,9 +103,18 @@ export interface CurveSceneOptions {
   colorMode?: ColorMode
   /** The single color used when colorMode is 'uniform'. */
   color?: number
+  /** Per-subfield colors for the 'degree' mode: degree → hex. Absent → warm ramp. */
+  degreeColors?: Record<number, number>
   subfieldBoost?: boolean
   /** Explicit profile curve (paper reproduction) — replaces the solver's candidates. */
   profile?: ProfileCurve
+  /**
+   * Use the paper family (torus-lifts look): solve the amplitude b from τ with
+   * `lobes` as n and `skew` as the twist a (solvePaperFamily, lattice 'curve').
+   * Wall classes only — falls back to the general solver otherwise. Both `lobes`
+   * and `skew` stay live: changing either re-solves the paper family.
+   */
+  paper?: boolean
   /** Initial S³ rotation (α, β, γ) and projection-pole tilt. */
   view?: Partial<ViewAngles>
   /** Fired once after every completed recompute (showCurve → app.invalidate). */
@@ -112,8 +125,12 @@ export interface CurveSceneOptions {
 export interface CurveSceneUpdate {
   curve?: number | string | CurveData
   lobes?: number | null
+  /** θ-skew (paper twist). */
+  skew?: number
   /** Explicit profile curve; null = back to the solver's candidates. */
   profile?: ProfileCurve | null
+  /** Toggle the paper family (solved from lobes=n, skew=a). */
+  paper?: boolean
   embedding?: number
   k?: number
   fibers?: number
@@ -147,6 +164,7 @@ export class CurveScene {
 
   private _curve: LabeledCurve
   private _lobes: number | null
+  private _skew: number
   private _candidates: Candidate[] = []
   private _embedding: number
   private _k: number
@@ -158,7 +176,12 @@ export class CurveScene {
   private _displayGens: TorusPoint[] = []
   private _colorMode: ColorMode = 'degree'
   private _color = 0xd43b3b
+  /** Per-subfield color overrides for 'degree' mode (degree → hex). */
+  private _degreeColors = new Map<number, number>()
   private _profile: ProfileCurve | null = null
+  private _paper = false
+  /** The profile actually in use this build (explicit, or solved paper-family). */
+  private _activeProfile: ProfileCurve | null = null
   private _subfieldBoost = true
   private _selected: number | null = null
   private readonly _view: ViewAngles = { alpha: 0, beta: 0, gamma: 0, pole: 0 }
@@ -169,6 +192,7 @@ export class CurveScene {
     this.maxPoints = opts.maxPoints ?? 20000
     this._curve = resolveCurve(opts.curve ?? 0, this.catalog)
     this._lobes = opts.lobes ?? null
+    this._skew = opts.skew ?? 0
     this._k = opts.k ?? 2
     this._fibers = opts.fibers ?? 0
     this._gridlines = opts.gridlines ?? 0
@@ -176,7 +200,9 @@ export class CurveScene {
     this._cayleyBasis = opts.cayleyBasis ?? 'reduced'
     this._colorMode = opts.colorMode ?? 'degree'
     this._color = opts.color ?? 0xd43b3b
+    for (const [d, hex] of Object.entries(opts.degreeColors ?? {})) this._degreeColors.set(Number(d), hex)
     this._profile = opts.profile ?? null
+    this._paper = opts.paper ?? false
     this._subfieldBoost = opts.subfieldBoost ?? true
     Object.assign(this._view, opts.view)
     this._embedding = 0
@@ -223,6 +249,12 @@ export class CurveScene {
   get lobes(): number | null {
     return this._lobes
   }
+  get skew(): number {
+    return this._skew
+  }
+  get paper(): boolean {
+    return this._paper
+  }
   get embedding(): number {
     return this._embedding
   }
@@ -246,6 +278,18 @@ export class CurveScene {
   get colorMode(): ColorMode {
     return this._colorMode
   }
+  /** Sorted subfield degrees present (divisors of k with points). */
+  get degrees(): number[] {
+    return degreesOf(this._scene.E)
+  }
+  /** Effective color of subfield-degree d in 'degree' mode: override, else warm ramp. */
+  degreeColor(d: number): number {
+    return this._degreeColors.get(d) ?? degreeRamp(this.degrees).get(d) ?? 0xffffff
+  }
+  /** Per-subfield color overrides (degree → hex) — only the ones the user set. */
+  get degreeColors(): Record<number, number> {
+    return Object.fromEntries(this._degreeColors)
+  }
   get subfieldBoost(): boolean {
     return this._subfieldBoost
   }
@@ -266,6 +310,28 @@ export class CurveScene {
 
   setLobes(n: number | null): void {
     this.update({ lobes: n })
+  }
+
+  setSkew(s: number): void {
+    this.update({ skew: s })
+  }
+
+  setPaper(on: boolean): void {
+    this.update({ paper: on })
+  }
+
+  /**
+   * Raise (or restore) the live tessellation of the surface and the point spheres —
+   * smoother geometry to trace against. EXPENSIVE; call before a path-trace loop.
+   */
+  setHighRes(on: boolean): void {
+    this.torus.setResolution(on ? 256 : 128, on ? 256 : 128)
+    this.points.setSphereResolution(on ? 32 : 16, on ? 24 : 12)
+  }
+
+  /** Number of solver candidates (embeddings) available for the current curve. */
+  get embeddingCount(): number {
+    return this._candidates.length
   }
 
   setEmbedding(i: number): void {
@@ -305,6 +371,12 @@ export class CurveScene {
     this.update({ color: hex })
   }
 
+  /** Set the color of one subfield layer (degree d) and switch to 'degree' mode. */
+  setDegreeColor(d: number, hex: number): void {
+    this._degreeColors.set(d, hex)
+    this.update({ colorMode: 'degree' })
+  }
+
   /** Pin an explicit profile curve (null = back to the solver's candidates). */
   setProfile(p: ProfileCurve | null): void {
     this.update({ profile: p })
@@ -332,8 +404,16 @@ export class CurveScene {
       this._lobes = u.lobes
       touch('resolve')
     }
+    if (u.skew !== undefined) {
+      this._skew = u.skew
+      touch('resolve')
+    }
     if (u.profile !== undefined) {
       this._profile = u.profile
+      touch('resolve')
+    }
+    if (u.paper !== undefined) {
+      this._paper = u.paper
       touch('resolve')
     }
     if (u.k !== undefined) {
@@ -413,18 +493,34 @@ export class CurveScene {
   }
 
   private stageResolve(): void {
-    if (this._profile) {
-      this._candidates = [profileCandidate(this._profile)]
+    const tau = tauOf(this._curve.data.form)
+    // The active profile: an explicit curve, else the paper family solved from
+    // τ (torus-lifts: fix aesthetics a, n; solve amplitude b for L = 4π·Im τ).
+    this._activeProfile = this._profile
+    if (!this._activeProfile && this._paper) {
+      // paper family: n = lobes (or the paper heuristic when 'auto'), twist a =
+      // skew (or the paper default 0.8/n when unset — skew 0 is a flat circle);
+      // solve amplitude b from τ. Wall-only — off the wall it falls through.
+      const n = this._lobes ?? paperLobes(tau.im)
+      if (this._skew === 0) this._skew = Math.round((0.8 / n) * 1000) / 1000
+      // enough samples to resolve n lobes spectrally (matches catalog-lifts)
+      const samples = Math.max(256, 16 * n)
+      this._activeProfile = solvePaperFamily(tau, n, { a: this._skew, samples })?.curve ?? null
+    }
+    if (this._activeProfile) {
+      this._candidates = [profileCandidate(this._activeProfile)]
     } else {
-      const tau = tauOf(this._curve.data.form)
-      let cands = solveProfileCurve(tau, this._lobes !== null ? { n: this._lobes } : {})
-      // a pinned lobe count can be unsolvable for this τ — fall back to auto
-      // rather than leaving the scene without a curve
-      if (cands.length === 0 && this._lobes !== null) cands = solveProfileCurve(tau)
+      const skewOpt = this._skew !== 0 ? { skew: this._skew } : {}
+      let cands = solveProfileCurve(tau, {
+        ...(this._lobes !== null ? { n: this._lobes } : {}),
+        ...skewOpt,
+      })
+      // a pinned lobe count / skew can be unsolvable for this τ — fall back to
+      // auto rather than leaving the scene without a curve
+      if (cands.length === 0 && this._lobes !== null) cands = solveProfileCurve(tau, skewOpt)
       this._candidates = cands
     }
     if (this._candidates.length === 0) {
-      const tau = tauOf(this._curve.data.form)
       throw new Error(
         `solver produced no profile candidates for "${this._curve.label}" (τ = ${tau.re} + ${tau.im}i)`,
       )
@@ -438,8 +534,8 @@ export class CurveScene {
       this._curve.data,
       this._k,
       this._candidates[this._embedding]!,
-      // injected paper profiles only approximate τ — use the curve's own lattice
-      this._profile ? { lattice: 'curve' } : {},
+      // injected/paper profiles only approximate τ — use the curve's own lattice
+      this._activeProfile ? { lattice: 'curve' } : {},
     )
     this._selected = null
   }
@@ -502,7 +598,7 @@ export class CurveScene {
       this._colorMode === 'uniform'
         ? uniformColors(E.size, this._color)
         : this._colorMode === 'degree'
-          ? colorByDegree(E)
+          ? colorByDegreeMap(E, (d) => this.degreeColor(d))
           : this._colorMode === 'order'
             ? colorByOrder(E)
             : this._colorMode === 'coset1'

@@ -1,0 +1,4 @@
+[
+  { "label": "disc −3 · hexagonal", "p": 7, "trace": 5, "sign": 1, "form": { "a": 1, "b": 1, "c": 1 } },
+  { "label": "disc −4 · square", "p": 5, "trace": 4, "sign": 1, "form": { "a": 1, "b": 0, "c": 1 } }
+]

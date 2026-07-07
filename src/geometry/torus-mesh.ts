@@ -69,11 +69,19 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
   setSurface(hopf: HopfTorus): void {
     this.hopf = hopf
     const { uSegs, xSegs } = this
+    // lattice UV (see torus.ts): b = arcLength(2πx)/L runs the profile by arc length
+    // (congruent cells); a = u − b·A/4π is the holonomy shear so the x-seam matches.
+    const uv = this.geometry.getAttribute('uv') as THREE.BufferAttribute
+    const L = hopf.length
+    const twist = hopf.area / (4 * Math.PI)
     for (let j = 0; j <= xSegs; j++) {
-      const frame = hopf.profileFrameAt((TWO_PI * j) / xSegs)
+      const v = (TWO_PI * j) / xSegs
+      const frame = hopf.profileFrameAt(v)
+      const b = hopf.arcLength(v) / L
       for (let i = 0; i <= uSegs; i++) {
         const { point, normal } = framePoint(frame, (TWO_PI * i) / uSegs)
-        const at = 4 * (j * (uSegs + 1) + i)
+        const idx = j * (uSegs + 1) + i
+        const at = 4 * idx
         this.points4[at] = point.x
         this.points4[at + 1] = point.y
         this.points4[at + 2] = point.z
@@ -82,8 +90,10 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
         this.normals4[at + 1] = normal.y
         this.normals4[at + 2] = normal.z
         this.normals4[at + 3] = normal.w
+        uv.setXY(idx, i / uSegs - b * twist, b)
       }
     }
+    uv.needsUpdate = true
     if (this.lastProjection) this.reproject(this.lastProjection)
   }
 
@@ -156,6 +166,9 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
     const geometry = new THREE.BufferGeometry()
     geometry.setAttribute('position', new THREE.BufferAttribute(new Float32Array(3 * count), 3))
     geometry.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(3 * count), 3))
+    // lattice UVs (filled in setSurface): the flat coordinate in lattice units, so a
+    // texture tiles as the torus's fundamental domain — seamless + distortion-free
+    geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(2 * count), 2))
     // row-major two-triangle quads (threejs-demos buildGeometry layout)
     const index = new Uint32Array(6 * uSegs * xSegs)
     let at = 0

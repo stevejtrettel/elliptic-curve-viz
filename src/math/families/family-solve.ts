@@ -120,6 +120,15 @@ export function solveFamily(
   return { u, v, curve: family(u, v), achieved: { A: torus.area, L: torus.length }, residual: res }
 }
 
+/**
+ * The paper's lobe-count heuristic (lifting-modp tau.js): n ≈ 4·(Im τ)², the
+ * count that keeps the wavy circle's amplitude in a pleasing range as the torus
+ * gets longer/thinner. Clamped to [2, 24].
+ */
+export function paperLobes(imTau: number): number {
+  return Math.min(24, Math.max(2, Math.round(4 * imTau * imTau)))
+}
+
 /** The paper family φ = π/2 + a·b·cos(nt), θ = t + a·sin(2nt), sampled. */
 export function paperWavy(a: number, b: number, n: number, samples = 512): DiscreteCurve {
   return new DiscreteCurve(

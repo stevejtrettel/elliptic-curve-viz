@@ -1,5 +1,6 @@
-// Demo loader: every demos/<name>/main.ts is discovered statically; ?demo=<name>
-// selects one, no query shows the index. `vite build` bundles all demos (gallery-ready).
+// Demo loader (dev demos): every demos/<name>/main.ts is discovered statically;
+// ?demo=<name> selects one, no query shows the index. The curated ART gallery is
+// separate — see gallery/ (npm run gallery). `vite build` bundles all dev demos.
 
 const modules = import.meta.glob('./*/main.ts')
 
