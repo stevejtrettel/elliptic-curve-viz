@@ -101,6 +101,10 @@ export class HopfTorusMesh extends THREE.Mesh implements S3Renderable {
   setResolution(uSegments: number, xSegments: number): void {
     this.segsLive[0] = uSegments
     this.segsLive[1] = xSegments
+    // keep the trace grid at least as fine as live (never below its 384 floor),
+    // so a resolution control reaches the path-traced render, not just live
+    this.segsTrace[0] = Math.max(384, uSegments)
+    this.segsTrace[1] = Math.max(384, xSegments)
     if (this.displayMode !== 'live') return // applied on the next switch back
     this.uSegs = uSegments
     this.xSegs = xSegments

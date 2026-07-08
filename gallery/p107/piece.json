@@ -2,24 +2,28 @@
   "scene": {
     "rh": 4.5,
     "equalize": true,
-    "glassW": 1.15,
-    "glassD": 4,
-    "thick": 0.12,
-    "glassTilt": 0.19,
-    "glassH": 1.2,
-    "glassYaw": -0.27
+    "wallOn": true,
+    "wallDist": 3,
+    "wallW": 50,
+    "wallH": 30,
+    "complementary": true,
+    "pointL": 0.62,
+    "subfieldDark": 0.34,
+    "surfaceOn": false,
+    "res": 384
   },
   "units": [
     {
       "scale": 1.2,
       "pointRadius": 0.02,
-      "color": 13908795,
+      "color": 14389586,
       "lobes": 6,
       "skew": 0.05,
       "k": 2,
       "colorMode": "degree",
       "degreeColors": {
-        "2": 16089881
+        "1": 10363136,
+        "2": 13003776
       },
       "fibers": 0,
       "cayley": "off",
@@ -34,14 +38,14 @@
     {
       "scale": 1.2,
       "pointRadius": 0.02,
-      "color": 13908795,
+      "color": 10203220,
       "lobes": 3,
       "skew": 0.3,
       "k": 2,
       "colorMode": "degree",
       "degreeColors": {
-        "1": 1463576,
-        "2": 2792780
+        "1": 4874496,
+        "2": 8098304
       },
       "fibers": 0,
       "cayley": "off",
@@ -56,14 +60,14 @@
     {
       "scale": 1.1,
       "pointRadius": 0.015,
-      "color": 13908795,
+      "color": 14779297,
       "lobes": null,
       "skew": 0,
       "k": 2,
       "colorMode": "degree",
       "degreeColors": {
-        "1": 5836808,
-        "2": 10954021
+        "1": 10616913,
+        "2": 13392514
       },
       "fibers": 0,
       "cayley": "off",
@@ -78,14 +82,14 @@
     {
       "scale": 1.1,
       "pointRadius": 0.015,
-      "color": 13908795,
+      "color": 3128743,
       "lobes": null,
       "skew": 0,
       "k": 2,
       "colorMode": "degree",
       "degreeColors": {
-        "1": 6303625,
-        "2": 8411569
+        "1": 29785,
+        "2": 41609
       },
       "fibers": 0,
       "cayley": "off",
@@ -117,7 +121,7 @@
   },
   "studio": "colored",
   "look": {
-    "background": 2642811,
+    "background": 855309,
     "exposure": 1,
     "envIntensity": 0.95,
     "floorOffset": 0,

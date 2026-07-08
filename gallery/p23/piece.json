@@ -1,0 +1,98 @@
+{
+  "scene": {
+    "equalize": true,
+    "sep": 3.2,
+    "stagger": 2.4,
+    "lift": 2.4,
+    "backRot": {
+      "x": 2.11,
+      "y": 3.24,
+      "z": 0
+    },
+    "swap": false,
+    "wallOn": true,
+    "wallDist": 3,
+    "wallW": 120,
+    "wallH": 80,
+    "pointL": 0.62,
+    "subfieldDark": 0.34,
+    "surfaceOn": false
+  },
+  "units": [
+    {
+      "scale": 1.15,
+      "pointRadius": 0.03,
+      "color": 40874,
+      "res": 1536,
+      "lobes": 8,
+      "skew": 0.05,
+      "k": 2,
+      "colorMode": "degree",
+      "degreeColors": {
+        "1": 28294,
+        "2": 40623
+      },
+      "fibers": 0,
+      "cayley": "off",
+      "cayleyBasis": "reduced",
+      "view": {
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 0,
+        "pole": 0
+      }
+    },
+    {
+      "scale": 1,
+      "pointRadius": 0.095,
+      "color": 13590841,
+      "res": 384,
+      "lobes": null,
+      "skew": 0,
+      "k": 2,
+      "colorMode": "degree",
+      "degreeColors": {
+        "1": 10944512,
+        "2": 13590841
+      },
+      "fibers": 0,
+      "cayley": "off",
+      "cayleyBasis": "reduced",
+      "view": {
+        "alpha": 0,
+        "beta": 0,
+        "gamma": 0,
+        "pole": 0
+      }
+    }
+  ],
+  "camera": {
+    "position": [
+      1.503249537549567,
+      1.5637835141460668,
+      8.440210854254369
+    ],
+    "target": [
+      0.5290073096644395,
+      0.7820835022189351,
+      -0.5860503323424694
+    ],
+    "fov": 45
+  },
+  "export": {
+    "aspect": "1:1",
+    "longEdge": 2048
+  },
+  "studio": "colored",
+  "look": {
+    "background": 855309,
+    "exposure": 1,
+    "envIntensity": 0.95,
+    "floorOffset": 0,
+    "keyLightX": 0,
+    "lights": [
+      5,
+      2
+    ]
+  }
+}

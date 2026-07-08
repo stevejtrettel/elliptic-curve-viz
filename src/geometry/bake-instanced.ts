@@ -12,24 +12,36 @@
  */
 import * as THREE from 'three'
 
-/** Total triangle budget for one merged bake. */
+/** Total triangle budget for the whole traced scene's baked spheres. */
 const TRACE_TRI_BUDGET = 3_000_000
+
+/**
+ * Total instance count across ALL point clouds being baked this trace — set by
+ * the App before it bakes, so the detail budget is SCENE-wide, not per-cloud.
+ * One dense torus keeps high detail; six of them coarsen together. 0 = unset,
+ * fall back to the individual cloud's own count.
+ */
+let sceneInstanceTotal = 0
+export function setSceneInstanceTotal(n: number): void {
+  sceneInstanceTotal = n
+}
 
 /**
  * Icosahedron subdivision level for `count` instances: detail d costs
  * 20·4^d triangles per sphere; take the finest level within budget
- * (detail 4 = 5120 tris/sphere for small clouds, floor at detail 1 = 80).
+ * (detail 4 = 5120 tris/sphere for tiny clouds, floor at detail 0 = 20 for
+ * dense scenes — invisible at point scale, but 4× cheaper than detail 1).
  */
 export function traceSphereDetail(count: number): number {
-  for (const d of [4, 3, 2]) {
+  for (const d of [4, 3, 2, 1]) {
     if (count * 20 * 4 ** d <= TRACE_TRI_BUDGET) return d
   }
-  return 1
+  return 0
 }
 
 const templates = new Map<number, THREE.IcosahedronGeometry>()
 function templateFor(count: number): THREE.IcosahedronGeometry {
-  const detail = traceSphereDetail(count)
+  const detail = traceSphereDetail(Math.max(count, sceneInstanceTotal))
   let t = templates.get(detail)
   if (!t) {
     t = new THREE.IcosahedronGeometry(1, detail)
@@ -44,14 +56,27 @@ export function bakeInstancedMesh(mesh: THREE.InstancedMesh): THREE.Mesh {
   const tNor = template.getAttribute('normal') as THREE.BufferAttribute
   const vPer = tPos.count // icosahedron geometry is non-indexed triangle soup
 
-  const positions: number[] = []
-  const normals: number[] = []
-  const colors: number[] = []
   const m = new THREE.Matrix4()
   const nm = new THREE.Matrix3()
   const v = new THREE.Vector3()
   const c = new THREE.Color(1, 1, 1)
 
+  // Pass 1: count visible (non-zero-scale) instances so the buffers can be sized
+  // exactly. Preallocating typed arrays — instead of pushing into JS arrays and
+  // copying — avoids a transient boxed-array spike that OOMs at large point counts.
+  let visible = 0
+  for (let i = 0; i < mesh.count; i++) {
+    mesh.getMatrixAt(i, m)
+    if (Math.abs(m.determinant()) >= 1e-30) visible++
+  }
+  const nVerts = visible * vPer
+  const positions = new Float32Array(nVerts * 3)
+  const normals = new Float32Array(nVerts * 3)
+  const colors = new Float32Array(nVerts * 4) // RGBA: the tracer's pipeline expects itemSize 4
+
+  // Pass 2: transform each template vertex straight into the preallocated buffers.
+  let p = 0
+  let cp = 0
   for (let i = 0; i < mesh.count; i++) {
     mesh.getMatrixAt(i, m)
     if (Math.abs(m.determinant()) < 1e-30) continue // zero-scaled (hidden) instances
@@ -59,17 +84,28 @@ export function bakeInstancedMesh(mesh: THREE.InstancedMesh): THREE.Mesh {
     if (mesh.instanceColor) c.fromBufferAttribute(mesh.instanceColor as THREE.BufferAttribute, i)
     for (let k = 0; k < vPer; k++) {
       v.fromBufferAttribute(tPos, k).applyMatrix4(m)
-      positions.push(v.x, v.y, v.z)
+      positions[p] = v.x
+      positions[p + 1] = v.y
+      positions[p + 2] = v.z
       v.fromBufferAttribute(tNor, k).applyMatrix3(nm).normalize()
-      normals.push(v.x, v.y, v.z)
-      colors.push(c.r, c.g, c.b, 1) // RGBA: the tracer's geometry pipeline expects itemSize 4
+      normals[p] = v.x
+      normals[p + 1] = v.y
+      normals[p + 2] = v.z
+      p += 3
+      colors[cp] = c.r
+      colors[cp + 1] = c.g
+      colors[cp + 2] = c.b
+      colors[cp + 3] = 1
+      cp += 4
     }
   }
 
+  // BufferAttribute (not Float32BufferAttribute) takes the typed array directly —
+  // no second copy.
   const geometry = new THREE.BufferGeometry()
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
-  geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3))
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 4))
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+  geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3))
+  geometry.setAttribute('color', new THREE.BufferAttribute(colors, 4))
 
   const source = (Array.isArray(mesh.material) ? mesh.material[0] : mesh.material) as THREE.Material
   const material = source.clone() as THREE.MeshPhysicalMaterial

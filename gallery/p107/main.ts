@@ -1,14 +1,12 @@
 /**
  * p107 — the class group of the conductor-11 curve over F₁₀₇ (disc −104, ℤ/6),
  * laid on the SIXTH ROOTS OF UNITY: a form of class-group order d sits at a
- * primitive d-th root of unity, identity at ζ⁰=(1,0) on the real axis. A
- * HORIZONTAL glass plate on the real axis is the inversion g ↦ g⁻¹ (= complex
- * conjugation ζ^k ↦ ζ^{-k}):
+ * primitive d-th root of unity, identity at ζ⁰=(1,0) on the real axis. The real
+ * axis is the inversion g ↦ g⁻¹ (= complex conjugation ζ^k ↦ ζ^{-k}):
  *
  *      (3,2,9) ord3          (5,4,6) ord6        ← ζ², ζ¹   upper row
- *   (2,0,13) ord2 ───────────────── (1,0,26) id   ← ζ³, ζ⁰   real axis (on the glass)
+ *   (2,0,13) ord2 ───────────────── (1,0,26) id   ← ζ³, ζ⁰   real axis (mirror line)
  *      (3,-2,9) ord3         (5,-4,6) ord6        ← ζ⁴, ζ⁵   lower row
- *                 ══ glass (horizontal) ══
  *
  * The lower row is the EXACT mirror of the upper: each pair is built once from its
  * +b representative and reflected across y=0 (holder scale.y=−1), a correct
@@ -23,7 +21,7 @@
 import * as THREE from 'three'
 
 import { type CayleyBasis, type ColorMode, CurveScene, type CurveSceneOptions } from '@/author'
-import { glass, matte } from '@/geometry'
+import { matte } from '@/geometry'
 import { parseCurveDescriptors } from '@/io'
 import {
   App,
@@ -70,6 +68,64 @@ const cayleyValue = (c: number[]): string =>
 const cayleyFromValue = (v: string): number[] => (v === 'off' ? [] : v === 'g1' ? [0] : v === 'g2' ? [1] : [0, 1])
 const hex = (n: number): string => `#${n.toString(16).padStart(6, '0')}`
 const parseHex = (h: string): number => parseInt(h.replace(/^#/, ''), 16)
+
+// ── OKLCH color: perceptually even hues, exact complements (hue + 180°) ───────
+const PAL_C = 0.15 // chroma of the full-field points
+const SUBFIELD_SAT = 0.1 // extra chroma for subfield points (more saturated)
+// base hue per unit (order 6, order 3, identity, order 2); a pair's members take
+// hue and hue+180, so the six colors together span the rainbow.
+const BASE_HUE = [60, 120, 0, 180]
+
+function oklchHex(L: number, C: number, hDeg: number): number {
+  const h = (hDeg * Math.PI) / 180
+  const a = C * Math.cos(h)
+  const b = C * Math.sin(h)
+  const l_ = L + 0.3963377774 * a + 0.2158037573 * b
+  const m_ = L - 0.1055613458 * a - 0.0638541728 * b
+  const s_ = L - 0.0894841775 * a - 1.291485548 * b
+  const l = l_ * l_ * l_
+  const m = m_ * m_ * m_
+  const s = s_ * s_ * s_
+  const enc = (x: number): number => {
+    const c = Math.max(0, Math.min(1, x))
+    return c <= 0.0031308 ? 12.92 * c : 1.055 * c ** (1 / 2.4) - 0.055
+  }
+  const r = Math.round(enc(4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s) * 255)
+  const g = Math.round(enc(-1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s) * 255)
+  const bl = Math.round(enc(-0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s) * 255)
+  return (r << 16) | (g << 8) | bl
+}
+
+function hexToOklch(colorHex: number): { L: number; C: number; h: number } {
+  const dec = (v: number): number => {
+    const c = v / 255
+    return c <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4
+  }
+  const r = dec((colorHex >> 16) & 255)
+  const g = dec((colorHex >> 8) & 255)
+  const b = dec(colorHex & 255)
+  const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b)
+  const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b)
+  const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b)
+  const L = 0.2104542553 * l + 0.793617785 * m - 0.0040720468 * s
+  const a = 1.9779984951 * l - 2.428592205 * m + 0.4505937099 * s
+  const bb = 0.0259040371 * l + 0.7827717662 * m - 0.808675766 * s
+  let h = (Math.atan2(bb, a) * 180) / Math.PI
+  if (h < 0) h += 360
+  return { L, C: Math.hypot(a, bb), h }
+}
+function complement(colorHex: number): number {
+  const { L, C, h } = hexToOklch(colorHex)
+  return oklchHex(L, C, (h + 180) % 360)
+}
+/** A shade of `baseHex`'s hue: full-field points (frac=1) at the palette
+ *  lightness, subfield points (frac<1) progressively darker + more saturated. */
+function shade(baseHex: number, frac: number): number {
+  const { h } = hexToOklch(baseHex)
+  const L = state.pointL - (1 - frac) * state.subfieldDark
+  const C = PAL_C + (1 - frac) * SUBFIELD_SAT
+  return oklchHex(Math.max(0.05, L), C, h)
+}
 
 const app = new App()
 
@@ -125,12 +181,20 @@ makeUnit('order 3', '(3,±2,9)', 1, [
 makeUnit('identity', '(1,0,26)', 2, [{ vx: 1, vy: 0, reflect: false }]) // ζ⁰=(1,0), right, on the real axis
 makeUnit('order 2', '(2,0,13)', 3, [{ vx: -1, vy: 0, reflect: false }]) // ζ³=(−1,0), left, on the real axis
 
-// glass plate: thin box on the symmetry plane x=0, only between the columns
-const plate = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), glass(0xbfe3ff))
-app.stage.add(plate)
-
 const TARGET = 1.5 // common radius when sizes are equalized
-const state = { rh: 4, equalize: true, glassW: 1.3, glassD: 4, thick: 0.12, glassTilt: 0 }
+const state = {
+  rh: 4,
+  equalize: true,
+  wallOn: true,
+  wallDist: 3, // close behind the tori
+  wallW: 50, // extended to fill the frame
+  wallH: 30,
+  complementary: true, // reflected pair members take the complement (hue + 180°)
+  pointL: 0.62, // palette lightness of the full-field points (lower = darker)
+  subfieldDark: 0.34, // how much darker the subfield points get
+  surfaceOn: true, // show the (white) torus surfaces
+  res: 384, // torus mesh segments
+}
 
 /** Reposition + rescale everything; does NOT touch the camera (see Reframe). */
 function layout(): void {
@@ -144,9 +208,6 @@ function layout(): void {
       unit.holders[i]!.position.set(m.vx * state.rh, m.vy * state.rh, 0)
     })
   }
-  // horizontal glass slab on the real axis: x=width, y=thin, z=depth
-  plate.scale.set(state.glassW * state.rh, state.thick, state.glassD)
-  plate.rotation.set(state.glassTilt, 0, 0) // pitch about the horizontal axis — tilt toward the viewer
   app.invalidate()
 }
 
@@ -230,7 +291,6 @@ function applyScene(piece: SavedPiece): void {
       if (u.lobes !== undefined) s.setLobes(u.lobes)
       if (u.skew !== undefined) s.setSkew(u.skew)
       if (u.colorMode !== undefined) s.setColorMode(u.colorMode)
-      if (u.color !== undefined) s.setColor(u.color)
       if (u.degreeColors) for (const [d, hx] of Object.entries(u.degreeColors)) s.setDegreeColor(Number(d), hx)
       if (u.fibers !== undefined) s.setFibers(u.fibers)
       if (u.cayleyBasis !== undefined) s.setCayleyBasis(u.cayleyBasis)
@@ -238,6 +298,46 @@ function applyScene(piece: SavedPiece): void {
       if (u.view) s.setView(u.view)
       s.points.setBaseRadius(unit.params.pointRadius)
     }
+    applyUnitColor(unit) // recolor in the restored mode (base hue + shades/complement)
+  })
+}
+
+/** Color a unit in its current mode: base hue on member 0, its complement on the
+ *  reflected member. In Subfield (degree) mode, points get base-hue shades that
+ *  darken over subfields; in Uniform mode, one flat color per torus. */
+function applyUnitColor(unit: Unit): void {
+  const base = unit.params.color
+  const pair = unit.scenes.length === 2
+  const flat = unit.scenes[0]!.colorMode === 'uniform'
+  unit.scenes.forEach((s, i) => {
+    const mb = state.complementary && pair && i === 1 ? complement(base) : base
+    if (flat) {
+      s.setColorMode('uniform')
+      s.setColor(mb)
+    } else {
+      s.setColorMode('degree')
+      for (const d of s.degrees) s.setDegreeColor(d, shade(mb, d / Math.max(1, s.k)))
+    }
+  })
+  app.invalidate()
+}
+
+/** Show/hide the torus surfaces (the white shells the points sit on). */
+function applySurfaces(): void {
+  for (const unit of units) for (const s of unit.scenes) s.torus.visible = state.surfaceOn
+  app.invalidate()
+}
+
+function applyRes(): void {
+  for (const unit of units) for (const s of unit.scenes) s.torus.setResolution(state.res, state.res)
+  app.invalidate()
+}
+
+/** Assign the six-hue rainbow: each unit its base hue, pairs auto-complement. */
+function applyRainbow(): void {
+  units.forEach((unit, i) => {
+    unit.params.color = oklchHex(state.pointL, PAL_C, BASE_HUE[i] ?? 0)
+    applyUnitColor(unit)
   })
 }
 
@@ -268,11 +368,32 @@ const savedPiece = pieceGlob['./piece.json'] as SavedPiece | undefined
 // scene and the spread tori fall outside their range → nearly black in trace.
 if (savedPiece) applyScene(savedPiece)
 layout()
+applySurfaces()
+applyRes()
 let studioHandle = app.setStudio((savedPiece?.studio && STUDIOS[savedPiece.studio]) || colored)
 app.setBackground(0x28537b)
+
+// back wall — the ONLY backdrop now (no floor). A vertical plane SHARING the
+// studio floor's material, so it tracks the floor color (incl. the Studio →
+// Background picker) and catches bounce light + shadows in trace. Lives in
+// app.scene (not the stage), so it never skews the auto-framing.
+const wall = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), (studioHandle.floor?.material as THREE.Material) ?? matte(0x28537b))
+wall.receiveShadow = true
+app.scene.add(wall)
+function placeWall(): void {
+  wall.visible = state.wallOn
+  wall.material = (studioHandle.floor?.material as THREE.Material) ?? wall.material
+  studioHandle.floor?.removeFromParent() // drop the floor — the wall is the whole backdrop
+  wall.position.set(0, 0, -state.wallDist) // centered behind the tori
+  wall.scale.set(state.wallW, state.wallH, 1)
+  app.invalidate()
+}
+
 app.frame() // fit camera + floor to the laid-out scene
+placeWall()
 if (savedPiece?.camera) applyCamera(savedPiece.camera)
 if (savedPiece?.look) applyLook(savedPiece.look)
+if (!savedPiece) applyRainbow() // nice default palette for a fresh piece
 app.start()
 
 // ── controls ────────────────────────────────────────────────────────────────
@@ -287,23 +408,47 @@ sceneTab.toggle('Equalize sizes', state.equalize, (v) => {
   state.equalize = v
   layout()
 })
-sceneTab.slider('Glass width', { min: 0.5, max: 2.4, step: 0.05, value: state.glassW }, (v) => {
-  state.glassW = v
-  layout()
+sceneTab.toggle('Back wall', state.wallOn, (v) => {
+  state.wallOn = v
+  placeWall()
 })
-sceneTab.slider('Glass depth', { min: 1, max: 8, step: 0.25, value: state.glassD }, (v) => {
-  state.glassD = v
-  layout()
+sceneTab.slider('Wall distance', { min: 0, max: 30, step: 0.5, value: state.wallDist }, (v) => {
+  state.wallDist = v
+  placeWall()
 })
-sceneTab.slider('Glass thickness', { min: 0.02, max: 0.5, step: 0.02, value: state.thick }, (v) => {
-  state.thick = v
-  layout()
+sceneTab.slider('Wall width', { min: 5, max: 250, step: 1, value: state.wallW }, (v) => {
+  state.wallW = v
+  placeWall()
 })
-sceneTab.slider('Glass tilt', { min: -0.8, max: 0.8, step: 0.01, value: state.glassTilt }, (v) => {
-  state.glassTilt = v
-  layout()
+sceneTab.slider('Wall height', { min: 5, max: 160, step: 1, value: state.wallH }, (v) => {
+  state.wallH = v
+  placeWall()
 })
-sceneTab.button('Reframe', () => app.frame())
+sceneTab.button('Reframe', () => {
+  app.frame()
+  placeWall()
+})
+sceneTab.toggle('Complementary mirror', state.complementary, (v) => {
+  state.complementary = v
+  for (const unit of units) applyUnitColor(unit)
+})
+sceneTab.button('Rainbow palette', () => applyRainbow())
+sceneTab.slider('Point lightness', { min: 0.4, max: 0.85, step: 0.01, value: state.pointL }, (v) => {
+  state.pointL = v
+  for (const unit of units) applyUnitColor(unit)
+})
+sceneTab.slider('Subfield darkening', { min: 0, max: 0.5, step: 0.01, value: state.subfieldDark }, (v) => {
+  state.subfieldDark = v
+  for (const unit of units) applyUnitColor(unit)
+})
+sceneTab.slider('Mesh resolution', { min: 128, max: 1024, step: 32, value: state.res }, (v) => {
+  state.res = v
+  applyRes()
+})
+sceneTab.toggle('Torus surfaces', state.surfaceOn, (v) => {
+  state.surfaceOn = v
+  applySurfaces()
+})
 sceneTab.button('Path trace', () => {
   app.mode = app.mode === 'trace' ? 'live' : 'trace'
   app.invalidate()
@@ -335,6 +480,7 @@ addStudioControls(panel, app, studioHandle, {
     studioHandle = h
     app.setBackground(0x28537b)
     layout()
+    placeWall() // re-point the wall to the new studio's floor material + reposition
   },
 })
 
@@ -378,12 +524,16 @@ function buildUnitTab(unit: Unit): void {
     layout()
   })
   const colorModeDrop = t.dropdown('Point color', { options: COLOR_MODES, value: s0.colorMode }, (v) => {
-    touch((s) => s.setColorMode(v as ColorMode))
+    unit.scenes.forEach((s) => s.setColorMode(v as ColorMode))
+    applyUnitColor(unit)
     refreshColorUI()
   })
-  const uniformPicker = t.color('Uniform color', hex(unit.params.color), (h) => {
+  // the base hue for member 0; the reflected member auto-takes the complement,
+  // and (in Subfield mode) subfield points get darker shades of it
+  const uniformPicker = t.color('Base color', hex(unit.params.color), (h) => {
     unit.params.color = parseHex(h)
-    touch((s) => s.setColor(parseHex(h)))
+    applyUnitColor(unit)
+    refreshColorUI()
   })
   const subfieldPickers = new Map<number, ReturnType<typeof t.color>>()
   for (let d = s0.maxK; d >= 1; d--) {

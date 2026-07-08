@@ -31,7 +31,7 @@ export const GALLERY: GalleryEntry[] = [
   { demo: 'a4', category: 'characteristic', title: 'a = 4', blurb: 'F₅ trace 4 — disc −4.' },
 
   // ── one curve: y²−y=x³−x²−10x−20 (conductor 11), by prime p ──
-  { demo: 'p23', category: 'curve', title: 'p = 23', blurb: 'F₂₃ — trace −1, disc −91, 2 forms.' },
+  { demo: 'p23', category: 'curve', title: 'p = 23', blurb: 'F₂₃ — disc −91, two forms staggered in depth: round (5,3,5) in front, tall wavy (1,1,23) behind.' },
   { demo: 'p101', category: 'curve', title: 'p = 101', blurb: 'F₁₀₁ — one curve, trace 2, form (1,0,4).' },
   { demo: 'p107', category: 'curve', title: 'p = 107', blurb: 'F₁₀₇ — ℤ/6 as a framed glass hexagon; mirror pairs across the glass, self-conjugate forms on the axis.' },
 ]

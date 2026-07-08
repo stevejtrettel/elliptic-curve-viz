@@ -9,7 +9,7 @@ import * as THREE from 'three'
 import { PhysicalCamera, WebGLPathTracer } from 'three-gpu-pathtracer'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 
-import { isTraceBakeable } from '@/geometry'
+import { isTraceBakeable, setSceneInstanceTotal } from '@/geometry'
 
 import type { CameraSpec, StudioSpec } from './specs'
 import { type StudioHandle, TONE_MAPPING, compileStudio, placeCamera, placeFloor } from './studio'
@@ -189,9 +189,20 @@ export class App {
     return this._mode
   }
 
+  /** Sum instanced-point counts across the stage so the bake budgets detail
+   *  scene-wide (dense multi-torus scenes coarsen their spheres together). */
+  private syncSceneBudget(): void {
+    let total = 0
+    this.stage.traverse((o) => {
+      if ((o as THREE.InstancedMesh).isInstancedMesh) total += (o as THREE.InstancedMesh).count
+    })
+    setSceneInstanceTotal(total)
+  }
+
   set mode(m: 'live' | 'trace') {
     if (m === this._mode) return
     this._mode = m
+    if (m === 'trace') this.syncSceneBudget()
     this.stage.traverse((obj) => {
       if (isTraceBakeable(obj)) obj.setMode(m)
     })
@@ -210,6 +221,7 @@ export class App {
   /** ONE coarse signal: content changed. Rebakes and resyncs the tracer. */
   invalidate(): void {
     if (this._mode !== 'trace' || !this.pathTracer) return
+    this.syncSceneBudget() // point counts may have changed (k, add/remove) → rebudget
     this.stage.traverse((obj) => {
       if (isTraceBakeable(obj)) obj.setMode('trace') // bake any newcomers
     })
