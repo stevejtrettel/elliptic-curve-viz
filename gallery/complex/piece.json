@@ -1,0 +1,67 @@
+{
+  "scene": {
+    "N": 130,
+    "sP": 1,
+    "sDP": 0.12,
+    "projMode": "p.re,dp.re,dp.im",
+    "R": 8,
+    "yStretch": 1.2,
+    "tubeB": 0.065,
+    "tubeR": 0.15,
+    "showTwist": true,
+    "tubeT": 0.15,
+    "showGrid": true,
+    "gridBase": 6,
+    "gridLevels": 4,
+    "gridThick": 0.046,
+    "gridRatio": 0.75,
+    "showCorners": true,
+    "wallOn": true,
+    "wallDist": 9,
+    "wallW": 120,
+    "wallH": 80,
+    "mats": {
+      "glass": 13232895,
+      "glassRough": 0.15,
+      "grid": 5922147,
+      "gridRough": 0.45,
+      "real": 16731486,
+      "twist": 3069299
+    }
+  },
+  "pose": [
+    0.4437872809786626,
+    -0.36421467174482003,
+    -0.6697562196541952,
+    0.47098527403932733
+  ],
+  "camera": {
+    "position": [
+      8.826387608884472,
+      4.636418426596458,
+      30.350826321256324
+    ],
+    "target": [
+      0.2488513835974846,
+      0,
+      0
+    ],
+    "fov": 45
+  },
+  "export": {
+    "aspect": "1:1",
+    "longEdge": 2048
+  },
+  "studio": "colored",
+  "look": {
+    "background": 855309,
+    "exposure": 1,
+    "envIntensity": 0.95,
+    "floorOffset": 0,
+    "keyLightX": 0,
+    "lights": [
+      5,
+      2
+    ]
+  }
+}

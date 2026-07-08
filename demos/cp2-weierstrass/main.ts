@@ -11,10 +11,17 @@
 import * as THREE from 'three'
 
 import { Complex } from '@/math/core'
-import { paper, colored } from '@/geometry'
+import {
+  paper,
+  colored,
+  buildSurface,
+  buildHierGrid,
+  buildGridCorners,
+  makeProjection,
+  type Vec3,
+  type Run,
+} from '@/geometry'
 import { App, ControlPanel, addStudioControls, paperWhite } from '@/studio'
-
-import { buildSurface, buildHierGrid, buildGridCorners, makeProjection, type Vec3, type Run } from './surface'
 
 const app = new App()
 const content = new THREE.Group()

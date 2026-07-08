@@ -65,6 +65,25 @@ export function colored(color: THREE.ColorRepresentation = 0xffffff): THREE.Mesh
 }
 
 /**
+ * Metallic solid (e.g. pewter gridlines): tunable roughness + metalness.
+ * DoubleSide so open tube caps read from either face. Lower roughness → mirror
+ * chrome; ~0.4–0.6 → the soft dull sheen of pewter.
+ *
+ * A pure metal (metalness 1) has NO diffuse — it shows only its reflected
+ * surroundings, so a small feature facing empty/dark space renders black. For
+ * a colored metal that must read as its hue against a dark backdrop (e.g. a
+ * copper ring at an opening), drop metalness slightly (~0.85) so a little of
+ * the base-color albedo always shows through.
+ */
+export function metal(
+  color: THREE.ColorRepresentation = 0x8a8d92,
+  roughness = 0.45,
+  metalness = 1,
+): THREE.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({ color, roughness, metalness, side: THREE.DoubleSide })
+}
+
+/**
  * Opaque torus surface: DOUBLE-sided — wavy embeddings expose their inner
  * face. (Glass stays FrontSide: the tracer's transmission needs it.)
  */
