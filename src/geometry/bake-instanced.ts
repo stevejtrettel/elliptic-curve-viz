@@ -12,8 +12,12 @@
  */
 import * as THREE from 'three'
 
-/** Total triangle budget for the whole traced scene's baked spheres. */
-const TRACE_TRI_BUDGET = 3_000_000
+/** Total triangle budget for the whole traced scene's baked spheres. Sized for
+ *  smooth spheres on high-res PRINTS: sparse/medium pieces reach detail 4/3
+ *  (up to ~2.3k pts → 5120 tris, ~9.4k pts → 1280 tris). Raising this only ever
+ *  ADDS detail — it never coarsens a piece — so dense scenes (the p107 hexagon)
+ *  stay comparatively low on their own, the `count × tris` product self-limiting. */
+const TRACE_TRI_BUDGET = 12_000_000
 
 /**
  * Total instance count across ALL point clouds being baked this trace — set by

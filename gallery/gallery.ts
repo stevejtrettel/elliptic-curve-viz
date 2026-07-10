@@ -25,16 +25,18 @@ export interface GalleryEntry {
 export const GALLERY: GalleryEntry[] = [
   // ── one characteristic: curves over F₅, by trace a ──
   { demo: 'a0', category: 'characteristic', title: 'a = 0', blurb: 'F₅ trace 0 — the disc −20 pair (y²=x³+1, y²=x³+2).' },
+  { demo: 'a0-1', category: 'characteristic', title: 'a = 0 · (1,0,5)', blurb: 'F₅ trace 0 — the disc −20 form (1,0,5) alone, centered (square print).' },
+  { demo: 'a0-2', category: 'characteristic', title: 'a = 0 · (2,2,3)', blurb: 'F₅ trace 0 — the disc −20 form (2,2,3) alone, centered (square print).' },
   { demo: 'a1', category: 'characteristic', title: 'a = 1', blurb: 'F₅ trace 1 — disc −19.' },
   { demo: 'a2', category: 'characteristic', title: 'a = 2', blurb: 'F₅ trace 2 — disc −4 and −16, stacked.' },
   { demo: 'a3', category: 'characteristic', title: 'a = 3', blurb: 'F₅ trace 3 — disc −11.' },
   { demo: 'a4', category: 'characteristic', title: 'a = 4', blurb: 'F₅ trace 4 — disc −4.' },
 
   // ── one curve: y²−y=x³−x²−10x−20 (conductor 11), by prime p ──
-  { demo: 'complex', category: 'curve', title: 'over ℂ', blurb: 'ℂ — the curve as a complex torus E = ℂ/(ℤ+τℤ), τ = ½ + 2.42i, drawn in CP²: the characteristic-zero archetype the reductions mod p descend from.' },
+  { demo: 'complex', category: 'curve', title: 'over ℂ', blurb: 'ℂ — the curve as a complex torus E = ℂ/(ℤ+τℤ), τ = ½ + 1.1493i, drawn in CP²: the characteristic-zero archetype the reductions mod p descend from.' },
   { demo: 'p23', category: 'curve', title: 'p = 23', blurb: 'F₂₃ — disc −91, two forms staggered in depth: round (5,3,5) in front, tall wavy (1,1,23) behind.' },
   { demo: 'p101', category: 'curve', title: 'p = 101', blurb: 'F₁₀₁ — one curve, trace 2, form (1,0,4).' },
-  { demo: 'p107', category: 'curve', title: 'p = 107', blurb: 'F₁₀₇ — ℤ/6 as a framed glass hexagon; mirror pairs across the glass, self-conjugate forms on the axis.' },
+  { demo: 'p107', category: 'curve', title: 'p = 107', blurb: 'F₁₀₇ — the six forms of the class group ℤ/6, arranged as a hexagon.' },
 ]
 
 const SECTIONS: { category: GalleryCategory; title: string; blurb: string }[] = [

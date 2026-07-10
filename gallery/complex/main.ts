@@ -1,7 +1,7 @@
 /**
  * complex — the conductor-11 curve over ℂ: the characteristic-zero archetype of
  * the p-series (p23, p101, p107), shown as the complex torus itself. E = ℂ/Λ
- * with Λ = ℤ + τℤ, τ = ½ + 2.42i (fixed), drawn in an affine patch of CP² via
+ * with Λ = ℤ + τℤ, τ = ½ + 1.1493i (fixed), drawn in an affine patch of CP² via
  * z ↦ [℘(z):℘′(z):1] → R³ (surface builder in @/geometry/weierstrass-surface).
  *
  * On top of the paper surface: the line-at-infinity cutoff loop, the real locus
@@ -40,7 +40,7 @@ import {
 import { enablePlacement } from '@/author/place'
 
 // τ is FIXED — this piece is one specific complex torus (the conductor-11 curve).
-const TAU = new Complex(0.5, 2.42)
+const TAU = new Complex(0.5, 1.1493)
 const WALL_BG = 0x0d0d0d // near-black back wall — the shared "p-torus" vibe (as p23)
 const GRID_FACTOR = 2
 
@@ -302,18 +302,18 @@ app.start()
 // rotate, G move, Esc deselect. The pose lives on holder.quaternion (saved).
 const placement = enablePlacement(app, [holder], { onChange: () => app.invalidate() })
 placement.setMode('rotate')
-placement.select(0)
+// gizmo hidden by default (clean view); flip "Show gizmo" on to grab the rings
 
 // ── controls ──────────────────────────────────────────────────────────────
-const panel = new ControlPanel({ title: 'complex · τ = ½ + 2.42i', width: 460 })
+const panel = new ControlPanel({ title: 'complex · τ = ½ + 1.1493i', width: 460 })
 
 // Scene: the shared p-torus shell (orientation + wall + save).
 const sceneTab = panel.tab('Scene')
-sceneTab.label('Curve', 'E = ℂ/(ℤ + τℤ),  τ = ½ + 2.42i')
+sceneTab.label('Curve', 'E = ℂ/(ℤ + τℤ),  τ = ½ + 1.1493i')
 sceneTab.section('Orientation')
 sceneTab.label('Gizmo', 'drag the rings in the view · R rotate / G move')
 // Show/hide the gizmo (rings + highlight box) — turn it off for a clean render.
-sceneTab.toggle('Show gizmo', true, (on) => placement.select(on ? 0 : null))
+sceneTab.toggle('Show gizmo', false, (on) => placement.select(on ? 0 : null))
 sceneTab.toggle('Tool: Rotate (else Move)', true, (on) => placement.setMode(on ? 'rotate' : 'translate'))
 sceneTab.button('Reset orientation', () => {
   holder.quaternion.identity()
